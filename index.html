@@ -843,6 +843,7 @@
         const pos = getTouchPos(touch);
         const info = {
           lastX: pos.x, lastY: pos.y,
+          startX: pos.x, startY: pos.y,
           mutedString: -1,
           lastPlucked: -1,
         };
@@ -944,6 +945,7 @@
         }
 
         if (hit !== info.mutedString) {
+          let justPluckedMuted = false;
           if (info.mutedString >= 0) {
             const plucked = info.mutedString;
             unmuteString(plucked);
@@ -951,10 +953,11 @@
             if (!isStringMuted(plucked)) {
               pluckString(plucked, 0.45 + Math.random() * 0.2);
               info.lastPlucked = plucked;
+              justPluckedMuted = true;
             }
           }
 
-          if (hit >= 0 && hit !== info.lastPlucked) {
+          if (!justPluckedMuted && hit >= 0 && hit !== info.lastPlucked) {
             info.lastPlucked = hit;
             pluckString(hit, 0.4 + Math.random() * 0.2);
           }
@@ -977,7 +980,13 @@
         }
 
         if (info.mutedString >= 0) {
-          unmuteString(info.mutedString);
+          const idx = info.mutedString;
+          const moved = Math.hypot(info.lastX - info.startX, info.lastY - info.startY);
+          unmuteString(idx);
+          // If the finger swiped (moved enough), pluck the string on release
+          if (moved > 5 && !isStringMuted(idx)) {
+            pluckString(idx, 0.45 + Math.random() * 0.2);
+          }
         }
 
         activeTouches.delete(touch.identifier);
@@ -1003,6 +1012,8 @@
     let mouseDown = false;
     let mouseMutedString = -1;
     let mouseLastPlucked = -1;
+    let mouseStartX = 0, mouseStartY = 0;
+    let mouseLastX = 0, mouseLastY = 0;
 
     function getMousePos(e) {
       const rect = canvas.getBoundingClientRect();
@@ -1027,6 +1038,8 @@
 
       ensureAudio();
       mouseDown = true;
+      mouseStartX = pos.x; mouseStartY = pos.y;
+      mouseLastX = pos.x; mouseLastY = pos.y;
       const hit = hitTestString(pos.x, pos.y);
       mouseLastPlucked = -1;
       if (hit >= 0) {
@@ -1068,11 +1081,21 @@
           pluckString(hit, 0.4 + Math.random() * 0.2);
         }
       }
+
+      mouseLastX = pos.x; mouseLastY = pos.y;
     });
 
     canvas.addEventListener('mouseup', () => {
       tuneKnobDrag = -1;
-      if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
+      if (mouseMutedString >= 0) {
+        const idx = mouseMutedString;
+        const moved = Math.hypot(mouseLastX - mouseStartX, mouseLastY - mouseStartY);
+        unmuteString(idx);
+        if (moved > 5 && !isStringMuted(idx)) {
+          pluckString(idx, 0.45 + Math.random() * 0.2);
+        }
+        mouseMutedString = -1;
+      }
       mouseDown = false; mouseLastPlucked = -1;
     });
     canvas.addEventListener('mouseleave', () => {
