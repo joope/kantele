@@ -5,14 +5,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Kantele – Play Finnish Kantele Online | Virtual 5-String Instrument</title>
-  <meta name="description" content="Play the traditional Finnish kantele online. A beautiful virtual 5-string kantele instrument you can strum, pluck, and tune right in your browser. Free, no download needed.">
-  <meta name="keywords" content="kantele, Finnish kantele, virtual kantele, play kantele online, Finnish instrument, 5-string kantele, viisikielinen kantele, soita kanteletta, traditional Finnish music, string instrument">
+  <meta name="description"
+    content="Play the traditional Finnish kantele online. A beautiful virtual 5-string kantele instrument you can strum, pluck, and tune right in your browser. Free, no download needed.">
+  <meta name="keywords"
+    content="kantele, Finnish kantele, virtual kantele, play kantele online, Finnish instrument, 5-string kantele, viisikielinen kantele, soita kanteletta, traditional Finnish music, string instrument">
   <link rel="canonical" href="https://kantele.app">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Kantele – Play Finnish Kantele Online">
-  <meta property="og:description" content="Play the traditional Finnish kantele right in your browser. Strum, pluck, and tune a beautiful virtual 5-string kantele. Free, no download needed.">
+  <meta property="og:description"
+    content="Play the traditional Finnish kantele right in your browser. Strum, pluck, and tune a beautiful virtual 5-string kantele. Free, no download needed.">
   <meta property="og:image" content="https://kantele.app/kantele.png">
   <meta property="og:url" content="https://kantele.app">
   <meta property="og:locale" content="en_US">
@@ -21,7 +24,8 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Kantele – Play Finnish Kantele Online">
-  <meta name="twitter:description" content="Play the traditional Finnish kantele right in your browser. Free virtual 5-string kantele instrument.">
+  <meta name="twitter:description"
+    content="Play the traditional Finnish kantele right in your browser. Free virtual 5-string kantele instrument.">
   <meta name="twitter:image" content="https://kantele.app/kantele.png">
 
   <!-- Structured Data -->
@@ -427,117 +431,62 @@
       computeLayout();
     }
 
-    let rotated = false; // true when kantele is rotated 90° for portrait mobile
-
     function computeLayout() {
-      // Position the kantele image to fill most of the viewport.
-      // On mobile portrait, rotate 90° so the long axis uses screen height.
-
       const imgAspect = 4096 / 1948; // ~2.1:1
-      const isPortrait = H > W;
-      rotated = isMobile && isPortrait;
 
       let imgW, imgH;
 
-      if (rotated) {
-        // Rotated: fit to screen width (which maps to image height after rotation)
-        imgH = W;
-        imgW = imgH * imgAspect;
+      if (isMobile) {
+        // Mobile: stretch to fill the entire screen (squeeze to fit)
+        imgW = W;
+        imgH = H;
       } else {
-        // Fit to screen width, no cropping
+        // Desktop: fit to screen width (shows whole kantele)
         imgW = W;
         imgH = imgW / imgAspect;
       }
+
+      const imgX = (W - imgW) / 2;
+      const imgY = (H - imgH) / 2;
 
       const pos = stringPositions;
       stringEndpoints = [];
       stringHitAreas = [];
 
-      if (rotated) {
-        // Must match drawBody: translate(W/2, H/2) then rotate(PI/2)
-        // then image drawn at (-imgW/2, -imgH/2, imgW, imgH)
-        // A point at image-fraction (fx, fy) is at local coords:
-        //   lx = -imgW/2 + fx * imgW = (fx - 0.5) * imgW
-        //   ly = -imgH/2 + fy * imgH = (fy - 0.5) * imgH
-        // After rotate(PI/2): rx = -ly, ry = lx
-        // After translate: sx = W/2 + rx, sy = H/2 + ry
-        const cx = W / 2;
-        const cy = H / 2;
+      for (let i = 0; i < 5; i++) {
+        const x1 = imgX + pos.bridge[i].x * imgW;
+        const y1 = imgY + pos.bridge[i].y * imgH;
+        const x2 = imgX + pos.peg[i].x * imgW;
+        const y2 = imgY + pos.peg[i].y * imgH;
 
-        for (let i = 0; i < 5; i++) {
-          const lx1 = (pos.bridge[i].x - 0.5) * imgW;
-          const ly1 = (pos.bridge[i].y - 0.5) * imgH;
-          const lx2 = (pos.peg[i].x - 0.5) * imgW;
-          const ly2 = (pos.peg[i].y - 0.5) * imgH;
+        stringEndpoints.push({ x1, y1, x2, y2 });
 
-          const x1 = cx - ly1;
-          const y1 = cy + lx1;
-          const x2 = cx - ly2;
-          const y2 = cy + lx2;
-
-          stringEndpoints.push({ x1, y1, x2, y2 });
-
-          const gap = imgW * 0.06;
-          const hitR = Math.max(gap * 1.2, 28);
-          stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
-        }
-      } else {
-        const imgX = (W - imgW) / 2;
-        const imgY = (H - imgH) / 2;
-
-        for (let i = 0; i < 5; i++) {
-          const x1 = imgX + pos.bridge[i].x * imgW;
-          const y1 = imgY + pos.bridge[i].y * imgH;
-          const x2 = imgX + pos.peg[i].x * imgW;
-          const y2 = imgY + pos.peg[i].y * imgH;
-
-          stringEndpoints.push({ x1, y1, x2, y2 });
-
-          const gap = imgH * 0.06;
-          const hitR = isMobile ? Math.max(gap * 1.2, 28) : Math.max(gap * 0.7, 16);
-          stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
-        }
+        const gap = imgH * 0.06;
+        const hitR = isMobile ? Math.max(gap * 1.2, 28) : Math.max(gap * 0.7, 16);
+        stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
       }
 
-      // Tuning knob positions: offset from each peg end of the string
-      // In image space the offset is (+30, -55) i.e. right and up.
-      // When rotated 90° CW, image-right becomes screen-down and image-up becomes screen-right.
       tuneKnobPositions = [];
-      const knobOffX = rotated ? 55 : 30;
-      const knobOffY = rotated ? 30 : -55;
       for (let i = 0; i < 5; i++) {
         tuneKnobPositions.push({
-          x: stringEndpoints[i].x2 + knobOffX,
-          y: stringEndpoints[i].y2 + knobOffY,
+          x: stringEndpoints[i].x2 + 30,
+          y: stringEndpoints[i].y2 - 55,
         });
       }
 
-      computeLayout.body = { imgW, imgH };
+      computeLayout.body = { imgW, imgH, imgX, imgY };
     }
 
     function drawBody() {
       const b = computeLayout.body;
       if (!b || !imgLoaded) return;
-      const { imgW, imgH } = b;
+      const { imgW, imgH, imgX, imgY } = b;
 
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 30;
-
-      if (rotated) {
-        // Rotate 90° CW around screen center
-        ctx.translate(W / 2, H / 2);
-        ctx.rotate(Math.PI / 2);
-        ctx.shadowOffsetX = 16;
-        ctx.shadowOffsetY = 0;
-        ctx.drawImage(kanteleImg, -imgW / 2, -imgH / 2, imgW, imgH);
-      } else {
-        const imgX = (W - imgW) / 2;
-        const imgY = (H - imgH) / 2;
-        ctx.shadowOffsetY = 16;
-        ctx.drawImage(kanteleImg, imgX, imgY, imgW, imgH);
-      }
-
+      ctx.shadowOffsetY = 16;
+      ctx.drawImage(kanteleImg, imgX, imgY, imgW, imgH);
       ctx.restore();
     }
 
@@ -703,8 +652,7 @@
     let tuneKnobDragStartX = 0;
 
     function applyTuneKnobDrag(x, y) {
-      // When rotated, drag left/right maps to pitch; otherwise drag up/down
-      const delta = rotated ? (tuneKnobDragStartX - x) : (tuneKnobDragStartY - y);
+      const delta = tuneKnobDragStartY - y;
       const semitones = Math.max(-12, Math.min(12, tuneKnobDragStartVal + delta * 0.05));
       tuning[tuneKnobDrag] = semitones;
       updatePlaybackRate(tuneKnobDrag);
@@ -1241,6 +1189,7 @@
         await decodeSamples();
         startOverlay.classList.add('hidden');
         setTimeout(() => startOverlay.remove(), 400);
+
       });
     }
 
