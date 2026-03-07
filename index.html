@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kantele</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #000;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    canvas#kantele {
+      display: block;
+      cursor: pointer;
+      touch-action: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="kantele" aria-label="Kantele – touch or click the strings to play"></canvas>
+
+  <script>
+    // ─── Audio Engine ──────────────────────────────────────────────
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    let samplesLoaded = false;
+
+    function ensureAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!samplesLoaded) {
+        samplesLoaded = true;
+        loadSamples();
+      }
+      return audioCtx;
+    }
+
+    // ─── Sample Files ──────────────────────────────────────────────
+    const SAMPLE_FILES = ['A_5.mp3', 'G_4.mp3', 'F%23_3.mp3', 'E_2.mp3', 'D.mp3'];
+    const sampleBuffers = [null, null, null, null, null];
+
+    async function loadSamples() {
+      const ctx = ensureAudio();
+      await Promise.all(SAMPLE_FILES.map(async (file, i) => {
+        const resp = await fetch(file);
+        const arrayBuf = await resp.arrayBuffer();
+        sampleBuffers[i] = await ctx.decodeAudioData(arrayBuf);
+      }));
+    }
+
+    // ─── State ─────────────────────────────────────────────────────
+    let activeVoices = [null, null, null, null, null];
+    let stringVibration = [0, 0, 0, 0, 0];
+    let stringMuteCount = [0, 0, 0, 0, 0];
+    let muteVisual = [0, 0, 0, 0, 0];
+    let mutePos = [0.5, 0.5, 0.5, 0.5, 0.5]; // where along the string (0..1) the finger is
+    let isMobile = matchMedia('(pointer: coarse)').matches;
+
+    // ─── Kantele Image ────────────────────────────────────────────
+    const kanteleImg = new Image();
+    kanteleImg.src = 'kantele.png';
+    let imgLoaded = false;
+    kanteleImg.onload = () => { imgLoaded = true; };
+
+    // ─── String Positions (image-relative fractions) ──────────────
+    const stringPositions = {
+      bridge: [
+        { x: 0.2025381068046608, y: 0.44744621828396547 },
+        { x: 0.2025381068046608, y: 0.48149514728308646 },
+        { x: 0.20324215862287462, y: 0.5125832998475012 },
+        { x: 0.20394621044108843, y: 0.5466322288466222 },
+        { x: 0.20465026225930227, y: 0.577720381411037 },
+      ],
+      peg: [
+        { x: 0.6749568768261344, y: 0.35270137237336807 },
+        { x: 0.7228324004646742, y: 0.4089561246327853 },
+        { x: 0.7664836131939311, y: 0.46373048867484945 },
+        { x: 0.8129510331960432, y: 0.5229460173689728 },
+        { x: 0.8608265568345831, y: 0.5806811578457431 },
+      ],
+    };
+
+    // ─── Synthesis ─────────────────────────────────────────────────
+    function muteString(idx, pos) {
+      if (stringMuteCount[idx] === 0) {
+        stopString(idx);
+      }
+      stringMuteCount[idx]++;
+      if (pos !== undefined) mutePos[idx] = pos;
+    }
+
+    function unmuteString(idx) {
+      stringMuteCount[idx] = Math.max(0, stringMuteCount[idx] - 1);
+    }
+
+    function isStringMuted(idx) {
+      return stringMuteCount[idx] > 0;
+    }
+
+    function pluckString(stringIndex, velocity = 0.7) {
+      if (isStringMuted(stringIndex)) return;
+      if (!sampleBuffers[stringIndex]) return;
+      const ctx = ensureAudio();
+
+      stopString(stringIndex);
+
+      const source = ctx.createBufferSource();
+      source.buffer = sampleBuffers[stringIndex];
+
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = velocity;
+
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      source.start();
+
+      activeVoices[stringIndex] = { gain: gainNode, source, time: ctx.currentTime };
+      triggerVibration(stringIndex, velocity);
+    }
+
+    function stopString(idx) {
+      if (activeVoices[idx]) {
+        try {
+          const now = audioCtx.currentTime;
+          activeVoices[idx].gain.gain.setValueAtTime(activeVoices[idx].gain.gain.value, now);
+          activeVoices[idx].gain.gain.linearRampToValueAtTime(0, now + 0.05);
+          activeVoices[idx].source.stop(now + 0.06);
+        } catch (e) { }
+        activeVoices[idx] = null;
+      }
+      stringVibration[idx] = 0;
+    }
+
+    function stopAll() {
+      for (let i = 0; i < 5; i++) stopString(i);
+    }
+
+    function triggerVibration(idx, amplitude) {
+      stringVibration[idx] = Math.max(stringVibration[idx], amplitude);
+    }
+
+    // ─── Canvas ────────────────────────────────────────────────────
+    const canvas = document.getElementById('kantele');
+    const ctx = canvas.getContext('2d');
+    let W, H, dpr = window.devicePixelRatio || 1;
+    let stringEndpoints = [];
+    let stringHitAreas = [];
+    function resize() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      isMobile = matchMedia('(pointer: coarse)').matches;
+      zoomScale = 1; zoomX = 0; zoomY = 0;
+      computeLayout();
+    }
+
+    let rotated = false; // true when kantele is rotated 90° for portrait mobile
+
+    function computeLayout() {
+      // Position the kantele image to fill most of the viewport.
+      // On mobile portrait, rotate 90° so the long axis uses screen height.
+
+      const imgAspect = 4096 / 1948; // ~2.1:1
+      const isPortrait = H > W;
+      rotated = isMobile && isPortrait;
+
+      let imgW, imgH;
+
+      if (rotated) {
+        // Rotated: fit to screen width (which maps to image height after rotation)
+        imgH = W;
+        imgW = imgH * imgAspect;
+      } else {
+        // Fit to screen width, no cropping
+        imgW = W;
+        imgH = imgW / imgAspect;
+      }
+
+      const pos = stringPositions;
+      stringEndpoints = [];
+      stringHitAreas = [];
+
+      if (rotated) {
+        // Must match drawBody: translate(W/2, H/2) then rotate(PI/2)
+        // then image drawn at (-imgW/2, -imgH/2, imgW, imgH)
+        // A point at image-fraction (fx, fy) is at local coords:
+        //   lx = -imgW/2 + fx * imgW = (fx - 0.5) * imgW
+        //   ly = -imgH/2 + fy * imgH = (fy - 0.5) * imgH
+        // After rotate(PI/2): rx = -ly, ry = lx
+        // After translate: sx = W/2 + rx, sy = H/2 + ry
+        const cx = W / 2;
+        const cy = H / 2;
+
+        for (let i = 0; i < 5; i++) {
+          const lx1 = (pos.bridge[i].x - 0.5) * imgW;
+          const ly1 = (pos.bridge[i].y - 0.5) * imgH;
+          const lx2 = (pos.peg[i].x - 0.5) * imgW;
+          const ly2 = (pos.peg[i].y - 0.5) * imgH;
+
+          const x1 = cx - ly1;
+          const y1 = cy + lx1;
+          const x2 = cx - ly2;
+          const y2 = cy + lx2;
+
+          stringEndpoints.push({ x1, y1, x2, y2 });
+
+          const gap = imgW * 0.06;
+          const hitR = Math.max(gap * 1.2, 28);
+          stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
+        }
+      } else {
+        const imgX = (W - imgW) / 2;
+        const imgY = (H - imgH) / 2;
+
+        for (let i = 0; i < 5; i++) {
+          const x1 = imgX + pos.bridge[i].x * imgW;
+          const y1 = imgY + pos.bridge[i].y * imgH;
+          const x2 = imgX + pos.peg[i].x * imgW;
+          const y2 = imgY + pos.peg[i].y * imgH;
+
+          stringEndpoints.push({ x1, y1, x2, y2 });
+
+          const gap = imgH * 0.06;
+          const hitR = isMobile ? Math.max(gap * 1.2, 28) : Math.max(gap * 0.7, 16);
+          stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
+        }
+      }
+
+      computeLayout.body = { imgW, imgH };
+    }
+
+    function drawBody() {
+      const b = computeLayout.body;
+      if (!b || !imgLoaded) return;
+      const { imgW, imgH } = b;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 30;
+
+      if (rotated) {
+        // Rotate 90° CW around screen center
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.shadowOffsetX = 16;
+        ctx.shadowOffsetY = 0;
+        ctx.drawImage(kanteleImg, -imgW / 2, -imgH / 2, imgW, imgH);
+      } else {
+        const imgX = (W - imgW) / 2;
+        const imgY = (H - imgH) / 2;
+        ctx.shadowOffsetY = 16;
+        ctx.drawImage(kanteleImg, imgX, imgY, imgW, imgH);
+      }
+
+      ctx.restore();
+    }
+
+    function getStringPath(ep, dx, dy, len, nx, ny, vib, time, i) {
+      const points = [];
+      const steps = 60;
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const x = ep.x1 + dx * t;
+        const baseY = ep.y1 + dy * t;
+        const envelope = Math.sin(t * Math.PI);
+        const mode1 = Math.sin(t * Math.PI) * Math.sin(time * 25 + i);
+        const mode2 = Math.sin(t * Math.PI * 2) * Math.sin(time * 38 + i) * 0.3;
+        const displacement = vib * envelope * (mode1 + mode2) * 8;
+        points.push({ x: x + nx * displacement, y: baseY + ny * displacement });
+      }
+      return points;
+    }
+
+    function tracePath(points) {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let s = 1; s < points.length; s++) ctx.lineTo(points[s].x, points[s].y);
+    }
+
+    function drawStrings(time) {
+      for (let i = 0; i < 5; i++) {
+        const ep = stringEndpoints[i];
+        const vib = stringVibration[i];
+        const mute = muteVisual[i];
+        const thickness = 0.4 + i * 0.28;
+
+        ctx.save();
+
+        const dx = ep.x2 - ep.x1;
+        const dy = ep.y2 - ep.y1;
+        const len = Math.hypot(dx, dy);
+        const nx = -dy / len;
+        const ny = dx / len;
+
+
+        const points = getStringPath(ep, dx, dy, len, nx, ny, vib, time, i);
+        const stillPoints = vib < 0.02 ? points : getStringPath(ep, dx, dy, len, nx, ny, 0, time, i);
+
+        // Shadow underneath the string (subtle depth)
+        // Use multiple passes for soft shadow (ctx.filter blur is unreliable on mobile)
+        const shadowOff = 16;
+        const shadowDx = nx * 2;
+        const shadowDy = ny * 2 + shadowOff;
+        for (let s = 3; s >= 0; s--) {
+          const spread = s * 2.5;
+          tracePath(points.map(p => ({ x: p.x + shadowDx, y: p.y + shadowDy })));
+          ctx.strokeStyle = `rgba(0,0,0,${0.06 - s * 0.01})`;
+          ctx.lineWidth = thickness + 2 + spread * 2;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+
+        // Dark base layer — the core of the string
+        tracePath(points);
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = thickness;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Main metallic body — gradient along the perpendicular direction
+        // We approximate this by drawing two thinner lines offset to simulate
+        // a cylindrical highlight
+        tracePath(points.map(p => ({ x: p.x - nx * thickness * 0.15, y: p.y - ny * thickness * 0.15 })));
+        ctx.strokeStyle = '#aaa';
+        ctx.lineWidth = thickness * 0.7;
+        ctx.stroke();
+
+        // Bright specular highlight — thin line along the top edge
+        tracePath(points.map(p => ({ x: p.x - nx * thickness * 0.3, y: p.y - ny * thickness * 0.3 })));
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = thickness * 0.25;
+        ctx.stroke();
+
+        // Vibration glow (multiple passes instead of ctx.filter for mobile compat)
+        if (vib > 0.05) {
+          const glowRadius = vib * 6;
+          for (let g = 3; g >= 0; g--) {
+            const spread = g * glowRadius * 0.5;
+            tracePath(points);
+            ctx.strokeStyle = `rgba(200,210,220,${vib * 0.1})`;
+            ctx.lineWidth = thickness + vib * 12 + spread * 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+          }
+        }
+
+        // Fingertip on muted string
+        if (mute > 0.3) {
+          const ft = mutePos[i];
+          const fx = ep.x1 + dx * ft;
+          const fy = ep.y1 + dy * ft;
+          const fingerR = isMobile ? 14 : 8 + (thickness - 1) * 2;
+          ctx.beginPath();
+          ctx.arc(fx, fy, fingerR * mute, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(180, 140, 110, ${mute * 0.5})`;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(fx, fy, fingerR * mute * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(80, 50, 30, ${mute * 0.3})`;
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // ─── Animation Loop ────────────────────────────────────────────
+    let lastTime = 0;
+
+    function animate(timestamp) {
+      const time = timestamp / 1000;
+      const dt = time - lastTime;
+      lastTime = time;
+
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.translate(zoomX, zoomY);
+      ctx.scale(zoomScale, zoomScale);
+      drawBody();
+      drawStrings(time);
+      ctx.restore();
+
+      for (let i = 0; i < 5; i++) {
+        if (stringVibration[i] > 0) {
+          stringVibration[i] *= Math.pow(0.3, dt);
+          if (stringVibration[i] < 0.005) stringVibration[i] = 0;
+        }
+        const target = isStringMuted(i) ? 1 : 0;
+        muteVisual[i] += (target - muteVisual[i]) * Math.min(1, dt * 12);
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // ─── Pinch Zoom ──────────────────────────────────────────────
+    let zoomScale = 1;
+    let zoomX = 0, zoomY = 0; // pan offset in screen pixels
+    let pinchActive = false;
+    let pinchStartDist = 0;
+    let pinchStartScale = 1;
+    let pinchStartMidX = 0, pinchStartMidY = 0;
+    let pinchStartZoomX = 0, pinchStartZoomY = 0;
+
+    function screenToCanvas(sx, sy) {
+      return {
+        x: (sx - zoomX) / zoomScale,
+        y: (sy - zoomY) / zoomScale,
+      };
+    }
+
+    function clampZoom() {
+      zoomScale = Math.max(1, Math.min(5, zoomScale));
+      // Clamp pan so we don't scroll past the canvas edges
+      const maxPanX = (zoomScale - 1) * W / zoomScale;
+      const maxPanY = (zoomScale - 1) * H / zoomScale;
+      zoomX = Math.max(-maxPanX * zoomScale, Math.min(0, zoomX));
+      zoomY = Math.max(-maxPanY * zoomScale, Math.min(0, zoomY));
+    }
+
+    // ─── Hit Testing ───────────────────────────────────────────────
+    function pointToLineDistance(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const nearX = x1 + t * dx;
+      const nearY = y1 + t * dy;
+      return Math.hypot(px - nearX, py - nearY);
+    }
+
+    function hitTestString(x, y, radiusScale = 1) {
+      let best = -1;
+      let bestDist = Infinity;
+      for (let i = 0; i < 5; i++) {
+        const ha = stringHitAreas[i];
+        const d = pointToLineDistance(x, y, ha.x1, ha.y1, ha.x2, ha.y2);
+        if (d < ha.hitRadius * radiusScale && d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    // Position along string (0..1) closest to point
+    function stringParamAt(stringIdx, x, y) {
+      const ep = stringEndpoints[stringIdx];
+      const dx = ep.x2 - ep.x1;
+      const dy = ep.y2 - ep.y1;
+      const lenSq = dx * dx + dy * dy;
+      let t = ((x - ep.x1) * dx + (y - ep.y1) * dy) / lenSq;
+      return Math.max(0, Math.min(1, t));
+    }
+
+    // ─── Touch Input ───────────────────────────────────────────────
+    // Every finger on a string mutes it (like resting your finger on it).
+    // Sound only happens when a finger MOVES across a string — the crossing
+    // motion is the pluck. Lift finger = unmute that string.
+    // This mirrors real kantele: left hand holds fingers still on strings
+    // to dampen them, right hand sweeps across to sound the free ones.
+
+    const activeTouches = new Map();
+
+    function getScreenTouchPos(touch) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    }
+
+    function getTouchPos(touch) {
+      const screen = getScreenTouchPos(touch);
+      return screenToCanvas(screen.x, screen.y);
+    }
+
+    function getPinchInfo(touches) {
+      const a = getScreenTouchPos(touches[0]);
+      const b = getScreenTouchPos(touches[1]);
+      return {
+        dist: Math.hypot(a.x - b.x, a.y - b.y),
+        midX: (a.x + b.x) / 2,
+        midY: (a.y + b.y) / 2,
+      };
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      ensureAudio();
+
+      // Register new touches
+      for (const touch of e.changedTouches) {
+        const pos = getTouchPos(touch);
+        const info = {
+          lastX: pos.x, lastY: pos.y,
+          mutedString: -1,
+          lastPlucked: -1,
+        };
+        activeTouches.set(touch.identifier, info);
+      }
+
+      // If 2+ fingers → start pinch, but only if no finger is playing
+      if (e.touches.length >= 2) {
+        if (!pinchActive) {
+          // Check if any finger is muting or has plucked a string
+          let anyPlaying = false;
+          for (const [, info] of activeTouches) {
+            if (info.mutedString >= 0 || info.lastPlucked >= 0) {
+              anyPlaying = true;
+              break;
+            }
+          }
+          if (!anyPlaying) {
+            const p = getPinchInfo(e.touches);
+            pinchStartDist = p.dist;
+            pinchStartScale = zoomScale;
+            pinchStartMidX = p.midX;
+            pinchStartMidY = p.midY;
+            pinchStartZoomX = zoomX;
+            pinchStartZoomY = zoomY;
+            pinchActive = true;
+          }
+        }
+        if (pinchActive) return;
+      }
+
+      // Single finger → mute string if hit
+      for (const touch of e.changedTouches) {
+        const pos = getTouchPos(touch);
+        const hit = hitTestString(pos.x, pos.y);
+        const info = activeTouches.get(touch.identifier);
+        if (hit >= 0 && info) {
+          info.mutedString = hit;
+          muteString(hit, stringParamAt(hit, pos.x, pos.y));
+        }
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+
+      if (pinchActive && e.touches.length >= 2) {
+        const p = getPinchInfo(e.touches);
+        const newScale = Math.max(1, Math.min(5, pinchStartScale * (p.dist / pinchStartDist)));
+
+        // Zoom toward pinch midpoint
+        // The point under the pinch midpoint should stay fixed
+        const focusX = (pinchStartMidX - pinchStartZoomX) / pinchStartScale;
+        const focusY = (pinchStartMidY - pinchStartZoomY) / pinchStartScale;
+
+        zoomScale = newScale;
+        zoomX = p.midX - focusX * zoomScale;
+        zoomY = p.midY - focusY * zoomScale;
+
+        // Also allow panning
+        zoomX += (p.midX - pinchStartMidX) - (pinchStartMidX - pinchStartZoomX) * (newScale / pinchStartScale - 1);
+        zoomY += (p.midY - pinchStartMidY) - (pinchStartMidY - pinchStartZoomY) * (newScale / pinchStartScale - 1);
+
+        // Simpler: just compute directly
+        zoomX = p.midX - focusX * zoomScale;
+        zoomY = p.midY - focusY * zoomScale;
+
+        clampZoom();
+        return;
+      }
+
+      for (const touch of e.changedTouches) {
+        const info = activeTouches.get(touch.identifier);
+        if (!info) continue;
+        const pos = getTouchPos(touch);
+
+        const scale = info.mutedString >= 0 ? 0.5 : 1;
+        const hit = hitTestString(pos.x, pos.y, scale);
+
+        if (hit !== info.mutedString) {
+          if (info.mutedString >= 0) {
+            const plucked = info.mutedString;
+            unmuteString(plucked);
+            info.mutedString = -1;
+            if (!isStringMuted(plucked)) {
+              pluckString(plucked, 0.45 + Math.random() * 0.2);
+              info.lastPlucked = plucked;
+            }
+          }
+
+          if (hit >= 0 && hit !== info.lastPlucked) {
+            info.lastPlucked = hit;
+            pluckString(hit, 0.4 + Math.random() * 0.2);
+          }
+        }
+
+        info.lastX = pos.x;
+        info.lastY = pos.y;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      for (const touch of e.changedTouches) {
+        const info = activeTouches.get(touch.identifier);
+        if (!info) { activeTouches.delete(touch.identifier); continue; }
+
+        if (info.mutedString >= 0) {
+          unmuteString(info.mutedString);
+        }
+
+        activeTouches.delete(touch.identifier);
+      }
+
+      // End pinch when fewer than 2 fingers remain
+      if (e.touches.length < 2) {
+        pinchActive = false;
+      }
+    });
+
+    canvas.addEventListener('touchcancel', (e) => {
+      for (const touch of e.changedTouches) {
+        const info = activeTouches.get(touch.identifier);
+        if (info && info.mutedString >= 0) unmuteString(info.mutedString);
+        activeTouches.delete(touch.identifier);
+      }
+      if (e.touches.length < 2) pinchActive = false;
+    });
+
+    // ─── Mouse Input ───────────────────────────────────────────────
+    // Same model: click on string = mute. Drag across = pluck crossed strings.
+    let mouseDown = false;
+    let mouseMutedString = -1;
+    let mouseLastPlucked = -1;
+
+    function getMousePos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      return screenToCanvas(sx, sy);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const pos = getMousePos(e);
+
+      ensureAudio();
+      mouseDown = true;
+      const hit = hitTestString(pos.x, pos.y);
+      mouseLastPlucked = -1;
+      if (hit >= 0) {
+        mouseMutedString = hit;
+        muteString(hit, stringParamAt(hit, pos.x, pos.y));
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const pos = getMousePos(e);
+
+      if (!mouseDown) return;
+      const scale = mouseMutedString >= 0 ? 0.5 : 1;
+      const hit = hitTestString(pos.x, pos.y, scale);
+
+      if (hit !== mouseMutedString) {
+        // Finger moved off the muted string — that's the pluck
+        if (mouseMutedString >= 0) {
+          const plucked = mouseMutedString;
+          unmuteString(plucked);
+          mouseMutedString = -1;
+          // Only pluck if the string is now fully unmuted
+          if (!isStringMuted(plucked)) {
+            pluckString(plucked, 0.45 + Math.random() * 0.2);
+            mouseLastPlucked = plucked;
+          }
+        }
+
+        if (hit >= 0 && hit !== mouseLastPlucked) {
+          mouseLastPlucked = hit;
+          pluckString(hit, 0.4 + Math.random() * 0.2);
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
+      mouseDown = false; mouseLastPlucked = -1;
+    });
+    canvas.addEventListener('mouseleave', () => {
+      if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
+      mouseDown = false; mouseLastPlucked = -1;
+    });
+
+    // ─── Scroll-wheel Zoom (desktop) ────────────────────────────
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+
+      const oldScale = zoomScale;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      zoomScale = Math.max(1, Math.min(5, zoomScale * factor));
+
+      // Zoom toward cursor
+      zoomX = sx - (sx - zoomX) * (zoomScale / oldScale);
+      zoomY = sy - (sy - zoomY) * (zoomScale / oldScale);
+      clampZoom();
+    }, { passive: false });
+
+    // ─── Keyboard Input ────────────────────────────────────────────
+    const MUTE_KEYS = ['q', 'w', 'e', 'r', 't'];
+    const PLUCK_KEYS = ['1', '2', '3', '4', '5'];
+    const keyMutes = new Set();
+
+    document.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      const k = e.key.toLowerCase();
+
+      const muteIdx = MUTE_KEYS.indexOf(k);
+      if (muteIdx >= 0 && !keyMutes.has(k)) {
+        keyMutes.add(k);
+        muteString(muteIdx);
+        return;
+      }
+
+      const pluckIdx = PLUCK_KEYS.indexOf(e.key);
+      if (pluckIdx >= 0) {
+        pluckString(pluckIdx, 0.5 + Math.random() * 0.2);
+        return;
+      }
+
+      if (e.key === ' ') {
+        e.preventDefault();
+        const delay = 8 + Math.random() * 12;
+        for (let i = 0; i < 5; i++) {
+          setTimeout(() => pluckString(i, 0.5 + Math.random() * 0.15), i * delay);
+        }
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      const k = e.key.toLowerCase();
+      const muteIdx = MUTE_KEYS.indexOf(k);
+      if (muteIdx >= 0 && keyMutes.has(k)) {
+        keyMutes.delete(k);
+        unmuteString(muteIdx);
+      }
+    });
+
+    // ─── Init ──────────────────────────────────────────────────────
+    resize();
+    window.addEventListener('resize', resize);
+    requestAnimationFrame(animate);
+  </script>
+</body>
+
+</html>
