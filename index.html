@@ -31,6 +31,165 @@
       cursor: pointer;
       touch-action: none;
     }
+
+    #tuning-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #ccc;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: background 0.2s;
+    }
+
+    #tuning-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    #tuning-btn.active {
+      background: rgba(255, 255, 255, 0.28);
+      color: #fff;
+    }
+
+    #tuning-panel {
+      position: fixed;
+      top: 60px;
+      right: 12px;
+      z-index: 10;
+      background: rgba(20, 20, 20, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      display: none;
+      min-width: 200px;
+    }
+
+    #tuning-panel.open {
+      display: block;
+    }
+
+    #tuning-panel h3 {
+      color: #aaa;
+      font: 11px/1 system-ui, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .tune-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .tune-row label {
+      color: #ccc;
+      font: 13px/1 system-ui, sans-serif;
+      width: 24px;
+      text-align: right;
+    }
+
+    .tune-row input[type=range] {
+      flex: 1;
+      accent-color: #888;
+    }
+
+    .tune-row .tune-val {
+      color: #999;
+      font: 12px/1 monospace;
+      width: 62px;
+      text-align: right;
+    }
+
+    #tuning-panel button.reset-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #aaa;
+      font: 12px system-ui, sans-serif;
+      cursor: pointer;
+    }
+
+    #tuning-panel button.reset-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ccc;
+    }
+
+    #start-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 1;
+      transition: opacity 0.4s ease;
+    }
+
+    #start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #start-overlay .start-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    #start-overlay h1 {
+      color: #fff;
+      font: 300 28px/1.2 system-ui, sans-serif;
+      letter-spacing: 0.02em;
+    }
+
+    #start-overlay p {
+      color: rgba(255, 255, 255, 0.55);
+      font: 14px/1.5 system-ui, sans-serif;
+      max-width: 260px;
+    }
+
+    #start-overlay button {
+      background: none;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      width: 100px;
+      height: 100px;
+      color: #fff;
+      font-size: 15px;
+      font-family: system-ui, sans-serif;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    #start-overlay button:active {
+      transform: scale(0.95);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
   </style>
 </head>
 
@@ -38,35 +197,85 @@
 
   <canvas id="kantele" aria-label="Kantele – touch or click the strings to play"></canvas>
 
+  <div id="start-overlay">
+    <div class="start-content">
+      <p>Tervetuloa soittamaan kanteletta.<br>Welcome to play kantele.</p>
+      <button id="start-btn">Soita</button>
+    </div>
+  </div>
+
+  <button id="tuning-btn" aria-label="Tuning">&#9881;</button>
+  <div id="tuning-panel">
+    <h3>Tuning</h3>
+    <div id="tune-rows"></div>
+    <button class="reset-btn" id="tune-reset">Reset</button>
+  </div>
+
   <script>
     // ─── Audio Engine ──────────────────────────────────────────────
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
 
-    let samplesLoaded = false;
-
-    function ensureAudio() {
-      if (!audioCtx) audioCtx = new AudioCtx();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      if (!samplesLoaded) {
-        samplesLoaded = true;
-        loadSamples();
-      }
-      return audioCtx;
-    }
-
     // ─── Sample Files ──────────────────────────────────────────────
     const SAMPLE_FILES = ['A_5.mp3', 'G_4.mp3', 'F%23_3.mp3', 'E_2.mp3', 'D.mp3'];
     const sampleBuffers = [null, null, null, null, null];
+    const sampleRawData = [null, null, null, null, null];
+    let samplesDecoded = false;
 
-    async function loadSamples() {
-      const ctx = ensureAudio();
-      await Promise.all(SAMPLE_FILES.map(async (file, i) => {
-        const resp = await fetch(file);
-        const arrayBuf = await resp.arrayBuffer();
-        sampleBuffers[i] = await ctx.decodeAudioData(arrayBuf);
-      }));
+    // Prefetch raw audio data immediately (no AudioContext needed)
+    const fetchPromise = Promise.all(SAMPLE_FILES.map(async (file, i) => {
+      const resp = await fetch(file);
+      sampleRawData[i] = await resp.arrayBuffer();
+    }));
+
+    let decodePromise = null;
+
+    function decodeSamples() {
+      if (decodePromise) return decodePromise;
+      decodePromise = (async () => {
+        await fetchPromise;
+        await Promise.all(sampleRawData.map(async (raw, i) => {
+          if (raw) sampleBuffers[i] = await audioCtx.decodeAudioData(raw);
+        }));
+      })();
+      return decodePromise;
     }
+
+    // Try to create context and decode eagerly (works on desktop;
+    // on iOS the context will be suspended but decoding still works)
+    try {
+      audioCtx = new AudioCtx();
+      fetchPromise.then(() => decodeSamples());
+    } catch (e) { }
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioCtx();
+        decodeSamples();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    // ─── Tuning ──────────────────────────────────────────────────
+    const STRING_NAMES = ['A', 'G', 'F♯', 'E', 'D'];
+    const BASE_SEMITONES = [0, 0, 0, 0, 0]; // semitone offset per string
+    let tuning = [...BASE_SEMITONES];
+
+    function loadTuning() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('kantele-tuning'));
+        if (Array.isArray(saved) && saved.length === 5) tuning = saved;
+      } catch (e) { }
+    }
+    function saveTuning() {
+      localStorage.setItem('kantele-tuning', JSON.stringify(tuning));
+    }
+    function semitonesToRate(semitones) {
+      return Math.pow(2, semitones / 12);
+    }
+
+    loadTuning();
 
     // ─── State ─────────────────────────────────────────────────────
     let activeVoices = [null, null, null, null, null];
@@ -126,6 +335,7 @@
 
       const source = ctx.createBufferSource();
       source.buffer = sampleBuffers[stringIndex];
+      source.playbackRate.value = semitonesToRate(tuning[stringIndex]);
 
       const gainNode = ctx.createGain();
       gainNode.gain.value = velocity;
@@ -165,6 +375,7 @@
     let W, H, dpr = window.devicePixelRatio || 1;
     let stringEndpoints = [];
     let stringHitAreas = [];
+    let tuneKnobPositions = [];
     function resize() {
       W = window.innerWidth;
       H = window.innerHeight;
@@ -250,6 +461,19 @@
         }
       }
 
+      // Tuning knob positions: offset from each peg end of the string
+      // In image space the offset is (+30, -55) i.e. right and up.
+      // When rotated 90° CW, image-right becomes screen-down and image-up becomes screen-right.
+      tuneKnobPositions = [];
+      const knobOffX = rotated ? 55 : 30;
+      const knobOffY = rotated ? 30 : -55;
+      for (let i = 0; i < 5; i++) {
+        tuneKnobPositions.push({
+          x: stringEndpoints[i].x2 + knobOffX,
+          y: stringEndpoints[i].y2 + knobOffY,
+        });
+      }
+
       computeLayout.body = { imgW, imgH };
     }
 
@@ -328,7 +552,7 @@
         for (let s = 3; s >= 0; s--) {
           const spread = s * 2.5;
           tracePath(points.map(p => ({ x: p.x + shadowDx, y: p.y + shadowDy })));
-          ctx.strokeStyle = `rgba(0,0,0,${0.06 - s * 0.01})`;
+          ctx.strokeStyle = `rgba(100,50,10,${0.06 - s * 0.01})`;
           ctx.lineWidth = thickness + 2 + spread * 2;
           ctx.lineCap = 'round';
           ctx.stroke();
@@ -388,6 +612,70 @@
       }
     }
 
+    // ─── Tuning Knobs (on-canvas) ─────────────────────────────────
+    const TUNE_KNOB_RADIUS = 12;
+    let tuneKnobDrag = -1; // index of knob being dragged, -1 = none
+    let tuneKnobDragStartY = 0;
+    let tuneKnobDragStartVal = 0;
+    let tuneKnobDragTouchId = null; // touch identifier for knob drag
+
+    function drawTuneKnobs() {
+      for (let i = 0; i < 5; i++) {
+        const kp = tuneKnobPositions[i];
+        const r = TUNE_KNOB_RADIUS;
+        const active = tuneKnobDrag === i;
+
+        // Knob circle
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Indicator line showing tuning offset (rotates with value)
+        const angle = -Math.PI / 2 + tuning[i] * (Math.PI / 12); // ±π at ±12 semitones
+        const ix = kp.x + Math.cos(angle) * r * 0.65;
+        const iy = kp.y + Math.sin(angle) * r * 0.65;
+        ctx.beginPath();
+        ctx.moveTo(kp.x, kp.y);
+        ctx.lineTo(ix, iy);
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    }
+
+    function hitTestTuneKnob(x, y) {
+      for (let i = 0; i < 5; i++) {
+        const kp = tuneKnobPositions[i];
+        if (Math.hypot(x - kp.x, y - kp.y) <= TUNE_KNOB_RADIUS + 6) return i;
+      }
+      return -1;
+    }
+
+    function updatePlaybackRate(idx) {
+      if (activeVoices[idx]) {
+        activeVoices[idx].source.playbackRate.value = semitonesToRate(tuning[idx]);
+      }
+    }
+
+    let tuneKnobDragStartX = 0;
+
+    function applyTuneKnobDrag(x, y) {
+      // When rotated, drag left/right maps to pitch; otherwise drag up/down
+      const delta = rotated ? (tuneKnobDragStartX - x) : (tuneKnobDragStartY - y);
+      const semitones = Math.max(-12, Math.min(12, tuneKnobDragStartVal + delta * 0.05));
+      tuning[tuneKnobDrag] = semitones;
+      updatePlaybackRate(tuneKnobDrag);
+      // Sync panel slider
+      tuneSliders[tuneKnobDrag].value = semitones;
+      tuneLabels[tuneKnobDrag].textContent = formatCents(semitones);
+      saveTuning();
+    }
+
     // ─── Animation Loop ────────────────────────────────────────────
     let lastTime = 0;
 
@@ -403,6 +691,7 @@
       ctx.scale(zoomScale, zoomScale);
       drawBody();
       drawStrings(time);
+      drawTuneKnobs();
       ctx.restore();
 
       for (let i = 0; i < 5; i++) {
@@ -547,11 +836,21 @@
         if (pinchActive) return;
       }
 
-      // Single finger → mute string if hit
+      // Check tuning knobs first, then strings
       for (const touch of e.changedTouches) {
         const pos = getTouchPos(touch);
-        const hit = hitTestString(pos.x, pos.y);
+        const knobHit = hitTestTuneKnob(pos.x, pos.y);
         const info = activeTouches.get(touch.identifier);
+        if (knobHit >= 0 && info) {
+          tuneKnobDrag = knobHit;
+          tuneKnobDragStartX = pos.x;
+          tuneKnobDragStartY = pos.y;
+          tuneKnobDragStartVal = tuning[knobHit];
+          tuneKnobDragTouchId = touch.identifier;
+          info.tuningKnob = true;
+          continue;
+        }
+        const hit = hitTestString(pos.x, pos.y);
         if (hit >= 0 && info) {
           info.mutedString = hit;
           muteString(hit, stringParamAt(hit, pos.x, pos.y));
@@ -592,8 +891,19 @@
         if (!info) continue;
         const pos = getTouchPos(touch);
 
+        // Handle tuning knob drag
+        if (info.tuningKnob && tuneKnobDrag >= 0 && touch.identifier === tuneKnobDragTouchId) {
+          applyTuneKnobDrag(pos.x, pos.y);
+          continue;
+        }
+
         const scale = info.mutedString >= 0 ? 0.5 : 1;
         const hit = hitTestString(pos.x, pos.y, scale);
+
+        // Reset lastPlucked when finger moves away from that string
+        if (info.lastPlucked >= 0 && hit !== info.lastPlucked) {
+          info.lastPlucked = -1;
+        }
 
         if (hit !== info.mutedString) {
           if (info.mutedString >= 0) {
@@ -622,6 +932,11 @@
       for (const touch of e.changedTouches) {
         const info = activeTouches.get(touch.identifier);
         if (!info) { activeTouches.delete(touch.identifier); continue; }
+
+        if (info.tuningKnob && touch.identifier === tuneKnobDragTouchId) {
+          tuneKnobDrag = -1;
+          tuneKnobDragTouchId = null;
+        }
 
         if (info.mutedString >= 0) {
           unmuteString(info.mutedString);
@@ -662,6 +977,16 @@
       e.preventDefault();
       const pos = getMousePos(e);
 
+      // Check tuning knobs first
+      const knobHit = hitTestTuneKnob(pos.x, pos.y);
+      if (knobHit >= 0) {
+        tuneKnobDrag = knobHit;
+        tuneKnobDragStartX = pos.x;
+        tuneKnobDragStartY = pos.y;
+        tuneKnobDragStartVal = tuning[knobHit];
+        return;
+      }
+
       ensureAudio();
       mouseDown = true;
       const hit = hitTestString(pos.x, pos.y);
@@ -675,17 +1000,25 @@
     canvas.addEventListener('mousemove', (e) => {
       const pos = getMousePos(e);
 
+      if (tuneKnobDrag >= 0) {
+        applyTuneKnobDrag(pos.x, pos.y);
+        return;
+      }
+
       if (!mouseDown) return;
       const scale = mouseMutedString >= 0 ? 0.5 : 1;
       const hit = hitTestString(pos.x, pos.y, scale);
 
+      // Reset lastPlucked when cursor moves away from that string
+      if (mouseLastPlucked >= 0 && hit !== mouseLastPlucked) {
+        mouseLastPlucked = -1;
+      }
+
       if (hit !== mouseMutedString) {
-        // Finger moved off the muted string — that's the pluck
         if (mouseMutedString >= 0) {
           const plucked = mouseMutedString;
           unmuteString(plucked);
           mouseMutedString = -1;
-          // Only pluck if the string is now fully unmuted
           if (!isStringMuted(plucked)) {
             pluckString(plucked, 0.45 + Math.random() * 0.2);
             mouseLastPlucked = plucked;
@@ -700,10 +1033,12 @@
     });
 
     canvas.addEventListener('mouseup', () => {
+      tuneKnobDrag = -1;
       if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
       mouseDown = false; mouseLastPlucked = -1;
     });
     canvas.addEventListener('mouseleave', () => {
+      tuneKnobDrag = -1;
       if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
       mouseDown = false; mouseLastPlucked = -1;
     });
@@ -764,6 +1099,89 @@
         unmuteString(muteIdx);
       }
     });
+
+    // ─── Tuning UI ────────────────────────────────────────────────
+    const tuningBtn = document.getElementById('tuning-btn');
+    const tuningPanel = document.getElementById('tuning-panel');
+    const tuneRows = document.getElementById('tune-rows');
+    const tuneReset = document.getElementById('tune-reset');
+
+    tuningBtn.addEventListener('click', () => {
+      tuningPanel.classList.toggle('open');
+      tuningBtn.classList.toggle('active');
+    });
+
+    // Prevent touch/mouse events on the panel from reaching the canvas
+    tuningPanel.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+    tuningPanel.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+    tuningPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    const tuneSliders = [];
+    const tuneLabels = [];
+
+    for (let i = 0; i < 5; i++) {
+      const row = document.createElement('div');
+      row.className = 'tune-row';
+
+      const label = document.createElement('label');
+      label.textContent = STRING_NAMES[i];
+
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = -12;
+      slider.max = 12;
+      slider.step = 0.01;
+      slider.value = tuning[i];
+
+      const val = document.createElement('span');
+      val.className = 'tune-val';
+      val.textContent = formatCents(tuning[i]);
+
+      slider.addEventListener('input', () => {
+        tuning[i] = Number(slider.value);
+        updatePlaybackRate(i);
+        val.textContent = formatCents(tuning[i]);
+        saveTuning();
+      });
+
+      row.appendChild(label);
+      row.appendChild(slider);
+      row.appendChild(val);
+      tuneRows.appendChild(row);
+      tuneSliders.push(slider);
+      tuneLabels.push(val);
+    }
+
+    function formatCents(v) {
+      const cents = Math.round(v * 100);
+      if (cents === 0) return '0 ¢';
+      return (cents > 0 ? '+' : '') + cents + ' ¢';
+    }
+
+    tuneReset.addEventListener('click', () => {
+      for (let i = 0; i < 5; i++) {
+        tuning[i] = 0;
+        tuneSliders[i].value = 0;
+        tuneLabels[i].textContent = formatCents(0);
+      }
+      saveTuning();
+    });
+
+    // ─── Start Overlay (mobile audio unlock) ──────────────────────
+    const startOverlay = document.getElementById('start-overlay');
+    const startBtn = document.getElementById('start-btn');
+
+    if (!matchMedia('(pointer: coarse)').matches) {
+      // Desktop — no overlay needed, remove immediately
+      startOverlay.remove();
+    } else {
+      startBtn.addEventListener('click', async () => {
+        ensureAudio();
+        await decodeSamples();
+        startOverlay.classList.add('hidden');
+        setTimeout(() => startOverlay.remove(), 400);
+      });
+    }
 
     // ─── Init ──────────────────────────────────────────────────────
     resize();
