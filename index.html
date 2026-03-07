@@ -1,10 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Kantele</title>
+  <title>Kantele – Play Finnish Kantele Online | Virtual 5-String Instrument</title>
+  <meta name="description" content="Play the traditional Finnish kantele online. A beautiful virtual 5-string kantele instrument you can strum, pluck, and tune right in your browser. Free, no download needed.">
+  <meta name="keywords" content="kantele, Finnish kantele, virtual kantele, play kantele online, Finnish instrument, 5-string kantele, viisikielinen kantele, soita kanteletta, traditional Finnish music, string instrument">
+  <link rel="canonical" href="https://kantele.app">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Kantele – Play Finnish Kantele Online">
+  <meta property="og:description" content="Play the traditional Finnish kantele right in your browser. Strum, pluck, and tune a beautiful virtual 5-string kantele. Free, no download needed.">
+  <meta property="og:image" content="https://kantele.app/kantele.png">
+  <meta property="og:url" content="https://kantele.app">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="fi_FI">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Kantele – Play Finnish Kantele Online">
+  <meta name="twitter:description" content="Play the traditional Finnish kantele right in your browser. Free virtual 5-string kantele instrument.">
+  <meta name="twitter:image" content="https://kantele.app/kantele.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Kantele",
+    "description": "Play the traditional Finnish kantele online. A virtual 5-string kantele instrument you can strum, pluck, and tune in your browser.",
+    "url": "https://kantele.app",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Any",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "inLanguage": ["en", "fi"],
+    "keywords": "kantele, Finnish kantele, virtual instrument, 5-string kantele, viisikielinen kantele"
+  }
+  </script>
+
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <style>
     *,
     *::before,
@@ -897,7 +935,7 @@
           continue;
         }
 
-        const scale = info.mutedString >= 0 ? 0.5 : 1;
+        const scale = info.mutedString >= 0 ? 0.15 : 1;
         const hit = hitTestString(pos.x, pos.y, scale);
 
         // Reset lastPlucked when finger moves away from that string
@@ -1006,7 +1044,7 @@
       }
 
       if (!mouseDown) return;
-      const scale = mouseMutedString >= 0 ? 0.5 : 1;
+      const scale = mouseMutedString >= 0 ? 0.15 : 1;
       const hit = hitTestString(pos.x, pos.y, scale);
 
       // Reset lastPlucked when cursor moves away from that string
