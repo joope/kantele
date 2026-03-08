@@ -297,7 +297,8 @@
       <p>Tervetuloa soittamaan kanteletta.<br>Welcome to play kantele.</p>
       <p style="color: rgba(255,255,255,0.35); font-size: 12px;">Press anywhere to start playing</p>
       <p><a href="https://iidamariakuronen.com" target="_blank" rel="noopener"
-          style="color: rgba(255,255,255,0.35); font-size: 11px; text-decoration: none;">Want to learn kantele? Meet a kantele player &amp; teacher&nbsp;→</a></p>
+          style="color: rgba(255,255,255,0.35); font-size: 11px; text-decoration: none;">Want to learn kantele? Meet a
+          kantele player &amp; teacher&nbsp;→</a></p>
     </div>
   </div>
 
@@ -529,9 +530,10 @@
 
       tuneKnobPositions = [];
       for (let i = 0; i < 5; i++) {
+        // Place knobs at the peg positions on the image
         tuneKnobPositions.push({
-          x: stringEndpoints[i].x2 + 30,
-          y: stringEndpoints[i].y2 - 55,
+          x: imgX + pos.peg[i].x * imgW,
+          y: imgY + pos.peg[i].y * imgH,
         });
       }
 
@@ -673,23 +675,23 @@
         const r = TUNE_KNOB_RADIUS;
         const active = tuneKnobDrag === i;
 
-        // Knob circle
+        // Solid knob
         ctx.beginPath();
         ctx.arc(kp.x, kp.y, r, 0, Math.PI * 2);
-        ctx.fillStyle = active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)';
+        ctx.fillStyle = active ? '#5a4a3a' : '#3d3028';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#6b5a48';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Indicator line showing tuning offset (rotates with value)
-        const angle = -Math.PI / 2 + tuning[i] * (Math.PI / 12); // ±π at ±12 semitones
+        // Indicator line — points in direction matching the tuning value
+        const angle = -Math.PI / 2 + tuning[i] * (Math.PI / 12);
         const ix = kp.x + Math.cos(angle) * r * 0.65;
         const iy = kp.y + Math.sin(angle) * r * 0.65;
         ctx.beginPath();
         ctx.moveTo(kp.x, kp.y);
         ctx.lineTo(ix, iy);
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.strokeStyle = '#a08868';
         ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.stroke();
@@ -713,11 +715,13 @@
     let tuneKnobDragStartX = 0;
 
     function applyTuneKnobDrag(x, y) {
-      const delta = tuneKnobDragStartY - y;
+      const dx = x - tuneKnobDragStartX;
+      const dy = tuneKnobDragStartY - y;
+      // Use whichever axis has more movement (right/up = higher pitch)
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
       const semitones = Math.max(-12, Math.min(12, tuneKnobDragStartVal + delta * 0.05));
       tuning[tuneKnobDrag] = semitones;
       updatePlaybackRate(tuneKnobDrag);
-      // Sync panel slider
       tuneSliders[tuneKnobDrag].value = semitones;
       tuneLabels[tuneKnobDrag].textContent = formatCents(semitones);
       saveTuning();
@@ -900,8 +904,17 @@
         }
         const hit = hitTestString(pos.x, pos.y);
         if (hit >= 0 && info) {
-          info.mutedString = hit;
-          muteString(hit, stringParamAt(hit, pos.x, pos.y));
+          info.hitString = hit;
+          info.touchTime = performance.now();
+          // Delay mute — if released quickly it's a pluck instead
+          const id = touch.identifier;
+          info.muteTimer = setTimeout(() => {
+            const i = activeTouches.get(id);
+            if (i && i.hitString >= 0 && i.mutedString < 0) {
+              i.mutedString = i.hitString;
+              muteString(i.hitString, stringParamAt(i.hitString, i.lastX, i.lastY));
+            }
+          }, 100);
         }
       }
     }, { passive: false });
@@ -959,6 +972,7 @@
             const plucked = info.mutedString;
             unmuteString(plucked);
             info.mutedString = -1;
+            info.hitString = -1; // strummed off — prevent duplicate pluck on release
             if (!isStringMuted(plucked)) {
               pluckString(plucked, 0.45 + Math.random() * 0.2);
               info.lastPlucked = plucked;
@@ -968,6 +982,7 @@
 
           if (!justPluckedMuted && hit >= 0 && hit !== info.lastPlucked) {
             info.lastPlucked = hit;
+            info.hitString = -1; // strummed — prevent duplicate pluck on release
             pluckString(hit, 0.4 + Math.random() * 0.2);
           }
         }
@@ -988,13 +1003,15 @@
           tuneKnobDragTouchId = null;
         }
 
+        if (info.muteTimer) clearTimeout(info.muteTimer);
+
         if (info.mutedString >= 0) {
-          const idx = info.mutedString;
-          const moved = Math.hypot(info.lastX - info.startX, info.lastY - info.startY);
-          unmuteString(idx);
-          // If the finger swiped (moved enough), pluck the string on release
-          if (moved > 5 && !isStringMuted(idx)) {
-            pluckString(idx, 0.45 + Math.random() * 0.2);
+          // Was held long enough to mute — just unmute on release
+          unmuteString(info.mutedString);
+        } else if (info.hitString >= 0) {
+          // Quick tap — pluck the string
+          if (!isStringMuted(info.hitString)) {
+            pluckString(info.hitString, 0.5 + Math.random() * 0.2);
           }
         }
 
@@ -1010,16 +1027,21 @@
     canvas.addEventListener('touchcancel', (e) => {
       for (const touch of e.changedTouches) {
         const info = activeTouches.get(touch.identifier);
-        if (info && info.mutedString >= 0) unmuteString(info.mutedString);
+        if (info) {
+          if (info.muteTimer) clearTimeout(info.muteTimer);
+          if (info.mutedString >= 0) unmuteString(info.mutedString);
+        }
         activeTouches.delete(touch.identifier);
       }
       if (e.touches.length < 2) pinchActive = false;
     });
 
     // ─── Mouse Input ───────────────────────────────────────────────
-    // Same model: click on string = mute. Drag across = pluck crossed strings.
+    // Quick click = pluck. Hold = mute. Drag across = pluck crossed strings.
     let mouseDown = false;
     let mouseMutedString = -1;
+    let mouseHitString = -1;
+    let mouseMuteTimer = null;
     let mouseLastPlucked = -1;
     let mouseStartX = 0, mouseStartY = 0;
     let mouseLastX = 0, mouseLastY = 0;
@@ -1051,9 +1073,15 @@
       mouseLastX = pos.x; mouseLastY = pos.y;
       const hit = hitTestString(pos.x, pos.y);
       mouseLastPlucked = -1;
+      mouseHitString = hit;
       if (hit >= 0) {
-        mouseMutedString = hit;
-        muteString(hit, stringParamAt(hit, pos.x, pos.y));
+        // Delay mute — quick click will pluck instead
+        mouseMuteTimer = setTimeout(() => {
+          if (mouseHitString >= 0 && mouseMutedString < 0) {
+            mouseMutedString = mouseHitString;
+            muteString(mouseHitString, stringParamAt(mouseHitString, mouseLastX, mouseLastY));
+          }
+        }, 150);
       }
     });
 
@@ -1096,21 +1124,24 @@
 
     canvas.addEventListener('mouseup', () => {
       tuneKnobDrag = -1;
+      if (mouseMuteTimer) { clearTimeout(mouseMuteTimer); mouseMuteTimer = null; }
       if (mouseMutedString >= 0) {
-        const idx = mouseMutedString;
-        const moved = Math.hypot(mouseLastX - mouseStartX, mouseLastY - mouseStartY);
-        unmuteString(idx);
-        if (moved > 5 && !isStringMuted(idx)) {
-          pluckString(idx, 0.45 + Math.random() * 0.2);
-        }
+        // Was held long enough to mute — just unmute on release
+        unmuteString(mouseMutedString);
         mouseMutedString = -1;
+      } else if (mouseHitString >= 0) {
+        // Quick click — pluck the string
+        if (!isStringMuted(mouseHitString)) {
+          pluckString(mouseHitString, 0.5 + Math.random() * 0.2);
+        }
       }
-      mouseDown = false; mouseLastPlucked = -1;
+      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;
     });
     canvas.addEventListener('mouseleave', () => {
       tuneKnobDrag = -1;
+      if (mouseMuteTimer) { clearTimeout(mouseMuteTimer); mouseMuteTimer = null; }
       if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
-      mouseDown = false; mouseLastPlucked = -1;
+      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;
     });
 
     // ─── Scroll-wheel Zoom (desktop) ────────────────────────────
