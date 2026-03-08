@@ -202,35 +202,14 @@
       text-align: center;
     }
 
-    #start-overlay h1 {
-      color: #fff;
-      font: 300 28px/1.2 system-ui, sans-serif;
-      letter-spacing: 0.02em;
-    }
-
     #start-overlay p {
       color: rgba(255, 255, 255, 0.55);
       font: 14px/1.5 system-ui, sans-serif;
       max-width: 260px;
     }
 
-    #start-overlay button {
-      background: none;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      width: 100px;
-      height: 100px;
-      color: #fff;
-      font-size: 15px;
-      font-family: system-ui, sans-serif;
-      letter-spacing: 0.05em;
+    #start-overlay {
       cursor: pointer;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-
-    #start-overlay button:active {
-      transform: scale(0.95);
-      border-color: rgba(255, 255, 255, 0.6);
     }
 
     #rotate-prompt {
@@ -253,8 +232,15 @@
     }
 
     @keyframes rotate-hint {
-      0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(90deg); }
+
+      0%,
+      100% {
+        transform: rotate(0deg);
+      }
+
+      50% {
+        transform: rotate(90deg);
+      }
     }
 
     #rotate-prompt p {
@@ -263,8 +249,36 @@
       max-width: 260px;
     }
 
+    #learn-link {
+      position: fixed;
+      bottom: 10px;
+      left: 0;
+      right: 0;
+      z-index: 9;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #learn-link a {
+      pointer-events: auto;
+      color: rgba(255, 255, 255, 0.35);
+      font: 12px/1 system-ui, sans-serif;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      transition: color 0.2s, background 0.2s;
+    }
+
+    #learn-link a:hover {
+      color: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
     @media (pointer: coarse) and (orientation: portrait) {
-      #rotate-prompt { display: flex; }
+      #rotate-prompt {
+        display: flex;
+      }
     }
   </style>
 </head>
@@ -281,8 +295,14 @@
   <div id="start-overlay">
     <div class="start-content">
       <p>Tervetuloa soittamaan kanteletta.<br>Welcome to play kantele.</p>
-      <button id="start-btn">Soita</button>
+      <p style="color: rgba(255,255,255,0.35); font-size: 12px;">Press anywhere to start playing</p>
+      <p><a href="https://iidamariakuronen.com" target="_blank" rel="noopener"
+          style="color: rgba(255,255,255,0.35); font-size: 11px; text-decoration: none;">Want to learn kantele? Meet a kantele player &amp; teacher&nbsp;→</a></p>
     </div>
+  </div>
+
+  <div id="learn-link"><a href="https://iidamariakuronen.com" target="_blank" rel="noopener">Want to learn kantele?
+      Connect with a teacher here→</a>
   </div>
 
   <button id="tuning-btn" aria-label="Tuning">&#9881;</button>
@@ -1219,13 +1239,12 @@
 
     // ─── Start Overlay (mobile audio unlock) ──────────────────────
     const startOverlay = document.getElementById('start-overlay');
-    const startBtn = document.getElementById('start-btn');
-
     if (!matchMedia('(pointer: coarse)').matches) {
       // Desktop — no overlay needed, remove immediately
       startOverlay.remove();
     } else {
-      startBtn.addEventListener('click', async () => {
+      startOverlay.addEventListener('click', async (e) => {
+        if (e.target.tagName === 'A') return; // let links work
         ensureAudio();
         await decodeSamples();
         startOverlay.classList.add('hidden');
