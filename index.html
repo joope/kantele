@@ -1107,6 +1107,7 @@
           const plucked = mouseMutedString;
           unmuteString(plucked);
           mouseMutedString = -1;
+          mouseHitString = -1; // strummed off — prevent duplicate pluck on release
           if (!isStringMuted(plucked)) {
             pluckString(plucked, 0.45 + Math.random() * 0.2);
             mouseLastPlucked = plucked;
@@ -1115,6 +1116,7 @@
 
         if (hit >= 0 && hit !== mouseLastPlucked) {
           mouseLastPlucked = hit;
+          mouseHitString = -1; // strummed — prevent duplicate pluck on release
           pluckString(hit, 0.4 + Math.random() * 0.2);
         }
       }
