@@ -525,7 +525,7 @@
     const kanteleImg = new Image();
     kanteleImg.src = 'kantele.png';
     let imgLoaded = false;
-    kanteleImg.onload = () => { imgLoaded = true; };
+    kanteleImg.onload = () => { imgLoaded = true; requestRedraw(); };
 
     // ─── String Positions (image-relative fractions) ──────────────
     const stringPositions = {
