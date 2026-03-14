@@ -281,97 +281,6 @@
       }
     }
 
-    #debug-btn {
-      position: fixed;
-      top: 12px;
-      right: 58px;
-      z-index: 10;
-      width: 40px;
-      height: 40px;
-      border: none;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.12);
-      color: #ccc;
-      font-size: 16px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      transition: background 0.2s;
-    }
-
-    #debug-btn:hover {
-      background: rgba(255, 255, 255, 0.22);
-    }
-
-    #debug-btn.active {
-      background: rgba(255, 80, 80, 0.35);
-      color: #fff;
-    }
-
-    #debug-panel {
-      position: fixed;
-      top: 60px;
-      right: 58px;
-      z-index: 10;
-      background: rgba(20, 20, 20, 0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 80, 80, 0.25);
-      border-radius: 12px;
-      padding: 16px;
-      display: none;
-      min-width: 240px;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-
-    #debug-panel.open {
-      display: block;
-    }
-
-    #debug-panel h3 {
-      color: #e88;
-      font: 11px/1 system-ui, sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 12px;
-    }
-
-    #debug-panel h4 {
-      color: #aaa;
-      font: 10px/1 system-ui, sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin: 10px 0 6px;
-    }
-
-    .debug-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .debug-row label {
-      color: #ccc;
-      font: 12px/1 system-ui, sans-serif;
-      min-width: 90px;
-    }
-
-    .debug-row input[type=range] {
-      flex: 1;
-      accent-color: #e88;
-    }
-
-    .debug-row .debug-val {
-      color: #999;
-      font: 11px/1 monospace;
-      min-width: 36px;
-      text-align: right;
-    }
   </style>
 </head>
 
@@ -396,43 +305,6 @@
 
   <div id="learn-link"><a href="https://iidamariakuronen.com" target="_blank" rel="noopener">Want to learn kantele?
       Connect with a teacher here→</a>
-  </div>
-
-  <button id="debug-btn" aria-label="Debug hit areas">&#9673;</button>
-  <div id="debug-panel">
-    <h3>Hit Area Debug</h3>
-    <h4>String hit radius</h4>
-    <div class="debug-row">
-      <label>Mobile mult</label>
-      <input type="range" id="dbg-str-mobile-mult" min="0.2" max="3" step="0.05" value="1.2">
-      <span class="debug-val" id="dbg-str-mobile-mult-val">1.2</span>
-    </div>
-    <div class="debug-row">
-      <label>Mobile min</label>
-      <input type="range" id="dbg-str-mobile-min" min="8" max="60" step="1" value="28">
-      <span class="debug-val" id="dbg-str-mobile-min-val">28</span>
-    </div>
-    <div class="debug-row">
-      <label>Desktop mult</label>
-      <input type="range" id="dbg-str-desktop-mult" min="0.1" max="2" step="0.05" value="0.7">
-      <span class="debug-val" id="dbg-str-desktop-mult-val">0.7</span>
-    </div>
-    <div class="debug-row">
-      <label>Desktop min</label>
-      <input type="range" id="dbg-str-desktop-min" min="4" max="40" step="1" value="16">
-      <span class="debug-val" id="dbg-str-desktop-min-val">16</span>
-    </div>
-    <h4>Tuning knob radius</h4>
-    <div class="debug-row">
-      <label>Knob radius</label>
-      <input type="range" id="dbg-knob-radius" min="4" max="40" step="1" value="12">
-      <span class="debug-val" id="dbg-knob-radius-val">12</span>
-    </div>
-    <div class="debug-row">
-      <label>Hit padding</label>
-      <input type="range" id="dbg-knob-padding" min="0" max="30" step="1" value="6">
-      <span class="debug-val" id="dbg-knob-padding-val">6</span>
-    </div>
   </div>
 
   <button id="tuning-btn" aria-label="Tuning">&#9881;</button>
@@ -485,6 +357,12 @@
     } catch (e) { }
 
     function ensureAudio() {
+      // After phone lock/unlock, iOS sets state to 'interrupted' or 'closed'
+      // and the context cannot be resumed — must create a fresh one
+      if (audioCtx && (audioCtx.state === 'closed' || audioCtx.state === 'interrupted')) {
+        audioCtx = null;
+        decodePromise = null;
+      }
       if (!audioCtx) {
         audioCtx = new AudioCtx();
         decodeSamples();
@@ -492,6 +370,18 @@
       if (audioCtx.state === 'suspended') audioCtx.resume();
       return audioCtx;
     }
+
+    // Re-activate audio when returning from lock screen / background tab
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && audioCtx) {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        } else if (audioCtx.state === 'interrupted' || audioCtx.state === 'closed') {
+          audioCtx = null;
+          decodePromise = null;
+        }
+      }
+    });
 
     // ─── Tuning ──────────────────────────────────────────────────
     const STRING_NAMES = ['A', 'G', 'F♯', 'E', 'D'];
@@ -662,9 +552,7 @@
         stringEndpoints.push({ x1, y1, x2, y2 });
 
         const gap = imgH * 0.06;
-        const hitR = isMobile
-          ? Math.max(gap * dbgStrMobileMult, dbgStrMobileMin)
-          : Math.max(gap * dbgStrDesktopMult, dbgStrDesktopMin);
+        const hitR = isMobile ? Math.max(gap * 1.2, 28) : Math.max(gap * 0.7, 16);
         stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
       }
 
@@ -822,19 +710,8 @@
       }
     }
 
-    // ─── Debug Mode ────────────────────────────────────────────────
-    let debugMode = false;
-    // Adjustable hit area params
-    let dbgStrMobileMult = 1.2;
-    let dbgStrMobileMin = 28;
-    let dbgStrDesktopMult = 0.7;
-    let dbgStrDesktopMin = 16;
-    let dbgKnobRadius = 12;
-    let dbgKnobPadding = 6;
-
     // ─── Tuning Knobs (on-canvas) ─────────────────────────────────
-    let TUNE_KNOB_RADIUS = 12;
-    let TUNE_KNOB_HIT_PADDING = 6;
+    const TUNE_KNOB_RADIUS = 12;
     let tuneKnobDrag = -1; // index of knob being dragged, -1 = none
     let tuneKnobDragStartY = 0;
     let tuneKnobDragStartVal = 0;
@@ -869,86 +746,12 @@
       }
     }
 
-    function drawDebugOverlay() {
-      if (!debugMode) return;
-      const colors = [
-        'rgba(255,80,80,0.25)',
-        'rgba(80,255,80,0.25)',
-        'rgba(80,80,255,0.25)',
-        'rgba(255,255,80,0.25)',
-        'rgba(255,80,255,0.25)',
-      ];
-      const strokeColors = [
-        'rgba(255,80,80,0.6)',
-        'rgba(80,255,80,0.6)',
-        'rgba(80,80,255,0.6)',
-        'rgba(255,255,80,0.6)',
-        'rgba(255,80,255,0.6)',
-      ];
-
-      // Draw string hit areas as thick translucent lines
-      for (let i = 0; i < 5; i++) {
-        const ha = stringHitAreas[i];
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(ha.x1, ha.y1);
-        ctx.lineTo(ha.x2, ha.y2);
-        ctx.strokeStyle = colors[i];
-        ctx.lineWidth = ha.hitRadius * 2;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-        // Outline edge
-        ctx.strokeStyle = strokeColors[i];
-        ctx.lineWidth = 1.5;
-        // Top edge
-        const dx = ha.x2 - ha.x1, dy = ha.y2 - ha.y1;
-        const len = Math.hypot(dx, dy);
-        const nx = -dy / len * ha.hitRadius, ny = dx / len * ha.hitRadius;
-        ctx.beginPath();
-        ctx.moveTo(ha.x1 + nx, ha.y1 + ny);
-        ctx.lineTo(ha.x2 + nx, ha.y2 + ny);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(ha.x1 - nx, ha.y1 - ny);
-        ctx.lineTo(ha.x2 - nx, ha.y2 - ny);
-        ctx.stroke();
-        // Label
-        ctx.fillStyle = strokeColors[i];
-        ctx.font = '11px system-ui, sans-serif';
-        ctx.fillText(`S${i + 1}: r=${Math.round(ha.hitRadius)}`, ha.x1 + nx * 1.2, ha.y1 + ny * 1.2 - 4);
-        ctx.restore();
-      }
-
-      // Draw tuning knob hit areas
-      for (let i = 0; i < 5; i++) {
-        const kp = tuneKnobPositions[i];
-        const hitR = TUNE_KNOB_RADIUS + TUNE_KNOB_HIT_PADDING;
-        // Hit area circle
-        ctx.beginPath();
-        ctx.arc(kp.x, kp.y, hitR, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,160,60,0.2)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255,160,60,0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        // Knob visual radius
-        ctx.beginPath();
-        ctx.arc(kp.x, kp.y, TUNE_KNOB_RADIUS, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255,160,60,0.4)';
-        ctx.setLineDash([3, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        // Label
-        ctx.fillStyle = 'rgba(255,160,60,0.8)';
-        ctx.font = '10px system-ui, sans-serif';
-        ctx.fillText(`K${i + 1}: ${TUNE_KNOB_RADIUS}+${TUNE_KNOB_HIT_PADDING}`, kp.x + hitR + 4, kp.y + 4);
-      }
-    }
-
     function hitTestTuneKnob(x, y) {
+      // Use the same hit radius as strings for consistent touch targets
+      const hitR = stringHitAreas.length > 0 ? stringHitAreas[0].hitRadius : TUNE_KNOB_RADIUS + 6;
       for (let i = 0; i < 5; i++) {
         const kp = tuneKnobPositions[i];
-        if (Math.hypot(x - kp.x, y - kp.y) <= TUNE_KNOB_RADIUS + TUNE_KNOB_HIT_PADDING) return i;
+        if (Math.hypot(x - kp.x, y - kp.y) <= hitR) return i;
       }
       return -1;
     }
@@ -959,6 +762,8 @@
       }
     }
 
+    let tuneKnobLastTap = 0; // timestamp of last knob tap
+    let tuneKnobLastTapIdx = -1; // which knob was last tapped
     let tuneKnobDragStartX = 0;
 
     function applyTuneKnobDrag(x, y) {
@@ -971,6 +776,15 @@
       updatePlaybackRate(tuneKnobDrag);
       tuneSliders[tuneKnobDrag].value = semitones;
       tuneLabels[tuneKnobDrag].textContent = formatCents(semitones);
+      debouncedSaveTuning();
+      requestRedraw();
+    }
+
+    function resetTuneKnob(idx) {
+      tuning[idx] = 0;
+      updatePlaybackRate(idx);
+      tuneSliders[idx].value = 0;
+      tuneLabels[idx].textContent = formatCents(0);
       debouncedSaveTuning();
       requestRedraw();
     }
@@ -1008,7 +822,6 @@
         drawBody();
         drawStrings(time);
         drawTuneKnobs();
-        drawDebugOverlay();
         ctx.restore();
       }
 
@@ -1100,6 +913,29 @@
       return best;
     }
 
+    // Test if line segment (ax,ay)→(bx,by) crosses segment (cx,cy)→(dx,dy)
+    function segmentsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+      const d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+      const d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+      if (d1 * d2 >= 0) return false; // same side
+      const d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
+      const d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+      if (d3 * d4 >= 0) return false; // same side
+      return true;
+    }
+
+    // Check which strings the movement from (ox,oy)→(nx,ny) crosses
+    function strumCrossTest(ox, oy, nx, ny) {
+      const crossed = [];
+      for (let i = 0; i < 5; i++) {
+        const ep = stringEndpoints[i];
+        if (segmentsCross(ox, oy, nx, ny, ep.x1, ep.y1, ep.x2, ep.y2)) {
+          crossed.push(i);
+        }
+      }
+      return crossed;
+    }
+
     // Position along string (0..1) closest to point
     function stringParamAt(stringIdx, x, y) {
       const ep = stringEndpoints[stringIdx];
@@ -1143,7 +979,7 @@
       e.preventDefault();
       ensureAudio();
 
-      // Register new touches
+      // Register new touches and check what they hit
       for (const touch of e.changedTouches) {
         const pos = getTouchPos(touch);
         const info = {
@@ -1152,21 +988,44 @@
           mutedString: -1,
           lastPlucked: -1,
         };
+        // Check tuning knobs first, then strings
+        const knobHit = hitTestTuneKnob(pos.x, pos.y);
+        if (knobHit >= 0) {
+          const now = performance.now();
+          if (knobHit === tuneKnobLastTapIdx && now - tuneKnobLastTap < 400) {
+            resetTuneKnob(knobHit);
+            tuneKnobLastTap = 0;
+            tuneKnobLastTapIdx = -1;
+            info.tuningKnob = true;
+          } else {
+            tuneKnobLastTap = now;
+            tuneKnobLastTapIdx = knobHit;
+            tuneKnobDrag = knobHit;
+            tuneKnobDragStartX = pos.x;
+            tuneKnobDragStartY = pos.y;
+            tuneKnobDragStartVal = tuning[knobHit];
+            tuneKnobDragTouchId = touch.identifier;
+            info.tuningKnob = true;
+          }
+        } else {
+          const hit = hitTestString(pos.x, pos.y);
+          if (hit >= 0) {
+            info.hitString = hit;
+            info.touchTime = performance.now();
+          }
+        }
         activeTouches.set(touch.identifier, info);
       }
 
-      // If 2+ fingers → start pinch, but only if no finger is playing
+      // If 2+ fingers → start pinch, but only if no string is being touched or muted
       if (e.touches.length >= 2) {
         if (!pinchActive) {
-          // Check if any finger is muting or has plucked a string
-          let anyPlaying = false;
+          const anyMuted = stringMuteCount.some(c => c > 0);
+          let anyOnString = false;
           for (const [, info] of activeTouches) {
-            if (info.mutedString >= 0 || info.lastPlucked >= 0) {
-              anyPlaying = true;
-              break;
-            }
+            if (info.hitString >= 0 || info.mutedString >= 0) { anyOnString = true; break; }
           }
-          if (!anyPlaying) {
+          if (!anyMuted && !anyOnString) {
             const p = getPinchInfo(e.touches);
             pinchStartDist = p.dist;
             pinchStartScale = zoomScale;
@@ -1180,34 +1039,18 @@
         if (pinchActive) return;
       }
 
-      // Check tuning knobs first, then strings
+      // Start mute timers for fingers on strings
       for (const touch of e.changedTouches) {
-        const pos = getTouchPos(touch);
-        const knobHit = hitTestTuneKnob(pos.x, pos.y);
         const info = activeTouches.get(touch.identifier);
-        if (knobHit >= 0 && info) {
-          tuneKnobDrag = knobHit;
-          tuneKnobDragStartX = pos.x;
-          tuneKnobDragStartY = pos.y;
-          tuneKnobDragStartVal = tuning[knobHit];
-          tuneKnobDragTouchId = touch.identifier;
-          info.tuningKnob = true;
-          continue;
-        }
-        const hit = hitTestString(pos.x, pos.y);
-        if (hit >= 0 && info) {
-          info.hitString = hit;
-          info.touchTime = performance.now();
-          // Delay mute — if released quickly it's a pluck instead
-          const id = touch.identifier;
-          info.muteTimer = setTimeout(() => {
-            const i = activeTouches.get(id);
-            if (i && i.hitString >= 0 && i.mutedString < 0) {
-              i.mutedString = i.hitString;
-              muteString(i.hitString, stringParamAt(i.hitString, i.lastX, i.lastY));
-            }
-          }, 100);
-        }
+        if (!info || info.tuningKnob || info.hitString < 0) continue;
+        const id = touch.identifier;
+        info.muteTimer = setTimeout(() => {
+          const i = activeTouches.get(id);
+          if (i && i.hitString >= 0 && i.mutedString < 0) {
+            i.mutedString = i.hitString;
+            muteString(i.hitString, stringParamAt(i.hitString, i.lastX, i.lastY));
+          }
+        }, 100);
       }
     }, { passive: false });
 
@@ -1251,32 +1094,35 @@
           continue;
         }
 
-        const scale = info.mutedString >= 0 ? 0.15 : 1;
-        const hit = hitTestString(pos.x, pos.y, scale);
-
-        // Reset lastPlucked when finger moves away from that string
-        if (info.lastPlucked >= 0 && hit !== info.lastPlucked) {
-          info.lastPlucked = -1;
+        // If muting a string and dragged off its hit area, unmute first
+        // (so strum check below sees it as unmuted, but we track it to avoid
+        // plucking it from this same movement)
+        let justUnmuted = -1;
+        if (info.mutedString >= 0) {
+          const hit = hitTestString(pos.x, pos.y, 0.15);
+          if (hit !== info.mutedString) {
+            justUnmuted = info.mutedString;
+            unmuteString(info.mutedString);
+            info.mutedString = -1;
+            info.hitString = -1;
+          }
         }
 
-        if (hit !== info.mutedString) {
-          let justPluckedMuted = false;
-          if (info.mutedString >= 0) {
-            const plucked = info.mutedString;
-            unmuteString(plucked);
-            info.mutedString = -1;
-            info.hitString = -1; // strummed off — prevent duplicate pluck on release
-            if (!isStringMuted(plucked)) {
-              pluckString(plucked, 0.45 + Math.random() * 0.2);
-              info.lastPlucked = plucked;
-              justPluckedMuted = true;
-            }
+        // Strum: check if finger path crossed any string lines
+        const crossed = strumCrossTest(info.lastX, info.lastY, pos.x, pos.y);
+        for (const si of crossed) {
+          // Skip the string currently muted by this finger
+          if (si === info.mutedString) continue;
+          // Skip the string that was just unmuted in this same move event
+          if (si === justUnmuted) continue;
+          if (!isStringMuted(si)) {
+            pluckString(si, 0.4 + Math.random() * 0.2);
           }
-
-          if (!justPluckedMuted && hit >= 0 && hit !== info.lastPlucked) {
-            info.lastPlucked = hit;
-            info.hitString = -1; // strummed — prevent duplicate pluck on release
-            pluckString(hit, 0.4 + Math.random() * 0.2);
+          // If the initial hit string was strummed, cancel the pending mute
+          if (si === info.hitString && info.muteTimer) {
+            clearTimeout(info.muteTimer);
+            info.muteTimer = null;
+            info.hitString = -1;
           }
         }
 
@@ -1387,30 +1233,34 @@
       }
 
       if (!mouseDown) return;
-      const scale = mouseMutedString >= 0 ? 0.15 : 1;
-      const hit = hitTestString(pos.x, pos.y, scale);
 
-      // Reset lastPlucked when cursor moves away from that string
-      if (mouseLastPlucked >= 0 && hit !== mouseLastPlucked) {
-        mouseLastPlucked = -1;
+      // If muting a string and dragged off its hit area, unmute first
+      let justUnmuted = -1;
+      if (mouseMutedString >= 0) {
+        const hit = hitTestString(pos.x, pos.y, 0.15);
+        if (hit !== mouseMutedString) {
+          justUnmuted = mouseMutedString;
+          unmuteString(mouseMutedString);
+          mouseMutedString = -1;
+          mouseHitString = -1;
+        }
       }
 
-      if (hit !== mouseMutedString) {
-        if (mouseMutedString >= 0) {
-          const plucked = mouseMutedString;
-          unmuteString(plucked);
-          mouseMutedString = -1;
-          mouseHitString = -1; // strummed off — prevent duplicate pluck on release
-          if (!isStringMuted(plucked)) {
-            pluckString(plucked, 0.45 + Math.random() * 0.2);
-            mouseLastPlucked = plucked;
-          }
+      // Strum: check if mouse path crossed any string lines
+      const crossed = strumCrossTest(mouseLastX, mouseLastY, pos.x, pos.y);
+      for (const si of crossed) {
+        // Skip the string currently muted by this pointer
+        if (si === mouseMutedString) continue;
+        // Skip the string that was just unmuted in this same move event
+        if (si === justUnmuted) continue;
+        if (!isStringMuted(si)) {
+          pluckString(si, 0.4 + Math.random() * 0.2);
         }
-
-        if (hit >= 0 && hit !== mouseLastPlucked) {
-          mouseLastPlucked = hit;
-          mouseHitString = -1; // strummed — prevent duplicate pluck on release
-          pluckString(hit, 0.4 + Math.random() * 0.2);
+        // If the initial hit string was strummed, cancel the pending mute
+        if (si === mouseHitString && mouseMuteTimer) {
+          clearTimeout(mouseMuteTimer);
+          mouseMuteTimer = null;
+          mouseHitString = -1;
         }
       }
 
@@ -1430,13 +1280,17 @@
           pluckString(mouseHitString, 0.5 + Math.random() * 0.2);
         }
       }
-      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;
-    });
+      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;     });
     canvas.addEventListener('mouseleave', () => {
       tuneKnobDrag = -1;
       if (mouseMuteTimer) { clearTimeout(mouseMuteTimer); mouseMuteTimer = null; }
       if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
-      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;
+      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;     });
+
+    canvas.addEventListener('dblclick', (e) => {
+      const pos = getMousePos(e);
+      const knobHit = hitTestTuneKnob(pos.x, pos.y);
+      if (knobHit >= 0) resetTuneKnob(knobHit);
     });
 
     // ─── Scroll-wheel Zoom (desktop) ────────────────────────────
@@ -1564,61 +1418,6 @@
       }
       saveTuning();
     });
-
-    // ─── Debug Panel ─────────────────────────────────────────────
-    const debugBtn = document.getElementById('debug-btn');
-    const debugPanel = document.getElementById('debug-panel');
-
-    debugBtn.addEventListener('click', () => {
-      debugMode = !debugMode;
-      debugPanel.classList.toggle('open', debugMode);
-      debugBtn.classList.toggle('active', debugMode);
-      requestRedraw();
-    });
-
-    // Prevent canvas interaction through panel
-    debugPanel.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
-    debugPanel.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
-    debugPanel.addEventListener('mousedown', (e) => e.stopPropagation());
-
-    function wireDebugSlider(id, getter, setter) {
-      const slider = document.getElementById(id);
-      const valEl = document.getElementById(id + '-val');
-      slider.value = getter();
-      valEl.textContent = getter();
-      slider.addEventListener('input', () => {
-        const v = Number(slider.value);
-        setter(v);
-        valEl.textContent = v;
-        computeLayout();
-        requestRedraw();
-      });
-    }
-
-    wireDebugSlider('dbg-str-mobile-mult',
-      () => dbgStrMobileMult,
-      (v) => { dbgStrMobileMult = v; }
-    );
-    wireDebugSlider('dbg-str-mobile-min',
-      () => dbgStrMobileMin,
-      (v) => { dbgStrMobileMin = v; }
-    );
-    wireDebugSlider('dbg-str-desktop-mult',
-      () => dbgStrDesktopMult,
-      (v) => { dbgStrDesktopMult = v; }
-    );
-    wireDebugSlider('dbg-str-desktop-min',
-      () => dbgStrDesktopMin,
-      (v) => { dbgStrDesktopMin = v; }
-    );
-    wireDebugSlider('dbg-knob-radius',
-      () => dbgKnobRadius,
-      (v) => { dbgKnobRadius = v; TUNE_KNOB_RADIUS = v; }
-    );
-    wireDebugSlider('dbg-knob-padding',
-      () => dbgKnobPadding,
-      (v) => { dbgKnobPadding = v; TUNE_KNOB_HIT_PADDING = v; }
-    );
 
     // ─── Start Overlay (mobile audio unlock) ──────────────────────
     const startOverlay = document.getElementById('start-overlay');
