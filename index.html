@@ -280,6 +280,98 @@
         display: flex;
       }
     }
+
+    #debug-btn {
+      position: fixed;
+      top: 12px;
+      right: 58px;
+      z-index: 10;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #ccc;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: background 0.2s;
+    }
+
+    #debug-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    #debug-btn.active {
+      background: rgba(255, 80, 80, 0.35);
+      color: #fff;
+    }
+
+    #debug-panel {
+      position: fixed;
+      top: 60px;
+      right: 58px;
+      z-index: 10;
+      background: rgba(20, 20, 20, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 80, 80, 0.25);
+      border-radius: 12px;
+      padding: 16px;
+      display: none;
+      min-width: 240px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    #debug-panel.open {
+      display: block;
+    }
+
+    #debug-panel h3 {
+      color: #e88;
+      font: 11px/1 system-ui, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    #debug-panel h4 {
+      color: #aaa;
+      font: 10px/1 system-ui, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 10px 0 6px;
+    }
+
+    .debug-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .debug-row label {
+      color: #ccc;
+      font: 12px/1 system-ui, sans-serif;
+      min-width: 90px;
+    }
+
+    .debug-row input[type=range] {
+      flex: 1;
+      accent-color: #e88;
+    }
+
+    .debug-row .debug-val {
+      color: #999;
+      font: 11px/1 monospace;
+      min-width: 36px;
+      text-align: right;
+    }
   </style>
 </head>
 
@@ -306,6 +398,43 @@
       Connect with a teacher here→</a>
   </div>
 
+  <button id="debug-btn" aria-label="Debug hit areas">&#9673;</button>
+  <div id="debug-panel">
+    <h3>Hit Area Debug</h3>
+    <h4>String hit radius</h4>
+    <div class="debug-row">
+      <label>Mobile mult</label>
+      <input type="range" id="dbg-str-mobile-mult" min="0.2" max="3" step="0.05" value="1.2">
+      <span class="debug-val" id="dbg-str-mobile-mult-val">1.2</span>
+    </div>
+    <div class="debug-row">
+      <label>Mobile min</label>
+      <input type="range" id="dbg-str-mobile-min" min="8" max="60" step="1" value="28">
+      <span class="debug-val" id="dbg-str-mobile-min-val">28</span>
+    </div>
+    <div class="debug-row">
+      <label>Desktop mult</label>
+      <input type="range" id="dbg-str-desktop-mult" min="0.1" max="2" step="0.05" value="0.7">
+      <span class="debug-val" id="dbg-str-desktop-mult-val">0.7</span>
+    </div>
+    <div class="debug-row">
+      <label>Desktop min</label>
+      <input type="range" id="dbg-str-desktop-min" min="4" max="40" step="1" value="16">
+      <span class="debug-val" id="dbg-str-desktop-min-val">16</span>
+    </div>
+    <h4>Tuning knob radius</h4>
+    <div class="debug-row">
+      <label>Knob radius</label>
+      <input type="range" id="dbg-knob-radius" min="4" max="40" step="1" value="12">
+      <span class="debug-val" id="dbg-knob-radius-val">12</span>
+    </div>
+    <div class="debug-row">
+      <label>Hit padding</label>
+      <input type="range" id="dbg-knob-padding" min="0" max="30" step="1" value="6">
+      <span class="debug-val" id="dbg-knob-padding-val">6</span>
+    </div>
+  </div>
+
   <button id="tuning-btn" aria-label="Tuning">&#9881;</button>
   <div id="tuning-panel">
     <h3>Tuning</h3>
@@ -322,7 +451,12 @@
     const SAMPLE_FILES = ['A_5.mp3', 'G_4.mp3', 'F%23_3.mp3', 'E_2.mp3', 'D.mp3'];
     const sampleBuffers = [null, null, null, null, null];
     const sampleRawData = [null, null, null, null, null];
-    let samplesDecoded = false;
+    // Debounced save for tuning
+    let _saveTuningTimer = null;
+    function debouncedSaveTuning() {
+      if (_saveTuningTimer) clearTimeout(_saveTuningTimer);
+      _saveTuningTimer = setTimeout(saveTuning, 300);
+    }
 
     // Prefetch raw audio data immediately (no AudioContext needed)
     const fetchPromise = Promise.all(SAMPLE_FILES.map(async (file, i) => {
@@ -418,10 +552,12 @@
       }
       stringMuteCount[idx]++;
       if (pos !== undefined) mutePos[idx] = pos;
+      requestRedraw();
     }
 
     function unmuteString(idx) {
       stringMuteCount[idx] = Math.max(0, stringMuteCount[idx] - 1);
+      requestRedraw();
     }
 
     function isStringMuted(idx) {
@@ -469,6 +605,7 @@
 
     function triggerVibration(idx, amplitude) {
       stringVibration[idx] = Math.max(stringVibration[idx], amplitude);
+      requestRedraw();
     }
 
     // ─── Canvas ────────────────────────────────────────────────────
@@ -489,6 +626,7 @@
       isMobile = matchMedia('(pointer: coarse)').matches;
       zoomScale = 1; zoomX = 0; zoomY = 0;
       computeLayout();
+      requestRedraw();
     }
 
     let playZoomed = false; // true after user taps play on mobile
@@ -524,7 +662,9 @@
         stringEndpoints.push({ x1, y1, x2, y2 });
 
         const gap = imgH * 0.06;
-        const hitR = isMobile ? Math.max(gap * 1.2, 28) : Math.max(gap * 0.7, 16);
+        const hitR = isMobile
+          ? Math.max(gap * dbgStrMobileMult, dbgStrMobileMin)
+          : Math.max(gap * dbgStrDesktopMult, dbgStrDesktopMin);
         stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
       }
 
@@ -553,29 +693,47 @@
       ctx.restore();
     }
 
-    function getStringPath(ep, dx, dy, len, nx, ny, vib, time, i) {
-      const points = [];
-      const steps = 60;
-      for (let s = 0; s <= steps; s++) {
-        const t = s / steps;
-        const x = ep.x1 + dx * t;
-        const baseY = ep.y1 + dy * t;
+    // Pre-allocated point arrays to avoid GC pressure in render loop
+    const _isMobileInit = matchMedia('(pointer: coarse)').matches;
+    const STRING_STEPS = _isMobileInit ? 30 : 60;
+    const _pathPoints = Array.from({ length: 5 }, () =>
+      Array.from({ length: STRING_STEPS + 1 }, () => ({ x: 0, y: 0 }))
+    );
+    const _shadowPoints = Array.from({ length: STRING_STEPS + 1 }, () => ({ x: 0, y: 0 }));
+    const _offsetPoints = Array.from({ length: STRING_STEPS + 1 }, () => ({ x: 0, y: 0 }));
+
+    // Pre-computed shadow color strings
+    const _shadowColors = [0, 1, 2, 3].map(s => `rgba(100,50,10,${0.06 - s * 0.01})`);
+
+    function computeStringPath(out, ep, dx, dy, nx, ny, vib, time, i) {
+      for (let s = 0; s <= STRING_STEPS; s++) {
+        const t = s / STRING_STEPS;
         const envelope = Math.sin(t * Math.PI);
-        const mode1 = Math.sin(t * Math.PI) * Math.sin(time * 25 + i);
-        const mode2 = Math.sin(t * Math.PI * 2) * Math.sin(time * 38 + i) * 0.3;
-        const displacement = vib * envelope * (mode1 + mode2) * 8;
-        points.push({ x: x + nx * displacement, y: baseY + ny * displacement });
+        const displacement = vib > 0.001
+          ? vib * envelope * (envelope * Math.sin(time * 25 + i) + Math.sin(t * Math.PI * 2) * Math.sin(time * 38 + i) * 0.3) * 8
+          : 0;
+        out[s].x = ep.x1 + dx * t + nx * displacement;
+        out[s].y = ep.y1 + dy * t + ny * displacement;
       }
-      return points;
     }
 
-    function tracePath(points) {
+    function tracePath(points, count) {
+      const n = count || points.length;
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
-      for (let s = 1; s < points.length; s++) ctx.lineTo(points[s].x, points[s].y);
+      for (let s = 1; s < n; s++) ctx.lineTo(points[s].x, points[s].y);
+    }
+
+    function tracePathOffset(points, count, offX, offY) {
+      const n = count || points.length;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x + offX, points[0].y + offY);
+      for (let s = 1; s < n; s++) ctx.lineTo(points[s].x + offX, points[s].y + offY);
     }
 
     function drawStrings(time) {
+      const nPts = STRING_STEPS + 1;
+
       for (let i = 0; i < 5; i++) {
         const ep = stringEndpoints[i];
         const vib = stringVibration[i];
@@ -590,52 +748,54 @@
         const nx = -dy / len;
         const ny = dx / len;
 
+        const points = _pathPoints[i];
+        computeStringPath(points, ep, dx, dy, nx, ny, vib, time, i);
 
-        const points = getStringPath(ep, dx, dy, len, nx, ny, vib, time, i);
-        const stillPoints = vib < 0.02 ? points : getStringPath(ep, dx, dy, len, nx, ny, 0, time, i);
-
-        // Shadow underneath the string (subtle depth)
-        // Use multiple passes for soft shadow (ctx.filter blur is unreliable on mobile)
-        const shadowOff = 16;
+        // Shadow underneath the string (fewer passes on mobile)
         const shadowDx = nx * 2;
-        const shadowDy = ny * 2 + shadowOff;
-        for (let s = 3; s >= 0; s--) {
+        const shadowDy = ny * 2 + 16;
+        const shadowStart = isMobile ? 1 : 3;
+        for (let s = shadowStart; s >= 0; s--) {
           const spread = s * 2.5;
-          tracePath(points.map(p => ({ x: p.x + shadowDx, y: p.y + shadowDy })));
-          ctx.strokeStyle = `rgba(100,50,10,${0.06 - s * 0.01})`;
+          tracePathOffset(points, nPts, shadowDx, shadowDy);
+          ctx.strokeStyle = _shadowColors[s];
           ctx.lineWidth = thickness + 2 + spread * 2;
           ctx.lineCap = 'round';
           ctx.stroke();
         }
 
-        // Dark base layer — the core of the string
-        tracePath(points);
+        // Dark base layer
+        tracePath(points, nPts);
         ctx.strokeStyle = '#555';
         ctx.lineWidth = thickness;
         ctx.lineCap = 'round';
         ctx.stroke();
 
-        // Main metallic body — gradient along the perpendicular direction
-        // We approximate this by drawing two thinner lines offset to simulate
-        // a cylindrical highlight
-        tracePath(points.map(p => ({ x: p.x - nx * thickness * 0.15, y: p.y - ny * thickness * 0.15 })));
+        // Main metallic body — offset line
+        const metalOffX = -nx * thickness * 0.15;
+        const metalOffY = -ny * thickness * 0.15;
+        tracePathOffset(points, nPts, metalOffX, metalOffY);
         ctx.strokeStyle = '#aaa';
         ctx.lineWidth = thickness * 0.7;
         ctx.stroke();
 
-        // Bright specular highlight — thin line along the top edge
-        tracePath(points.map(p => ({ x: p.x - nx * thickness * 0.3, y: p.y - ny * thickness * 0.3 })));
+        // Bright specular highlight
+        const specOffX = -nx * thickness * 0.3;
+        const specOffY = -ny * thickness * 0.3;
+        tracePathOffset(points, nPts, specOffX, specOffY);
         ctx.strokeStyle = 'rgba(255,255,255,0.6)';
         ctx.lineWidth = thickness * 0.25;
         ctx.stroke();
 
-        // Vibration glow (multiple passes instead of ctx.filter for mobile compat)
+        // Vibration glow (fewer passes on mobile)
         if (vib > 0.05) {
           const glowRadius = vib * 6;
-          for (let g = 3; g >= 0; g--) {
+          const glowColor = `rgba(200,210,220,${(vib * 0.1).toFixed(3)})`;
+          const glowStart = isMobile ? 1 : 3;
+          for (let g = glowStart; g >= 0; g--) {
             const spread = g * glowRadius * 0.5;
-            tracePath(points);
-            ctx.strokeStyle = `rgba(200,210,220,${vib * 0.1})`;
+            tracePath(points, nPts);
+            ctx.strokeStyle = glowColor;
             ctx.lineWidth = thickness + vib * 12 + spread * 2;
             ctx.lineCap = 'round';
             ctx.stroke();
@@ -650,11 +810,11 @@
           const fingerR = isMobile ? 14 : 8 + (thickness - 1) * 2;
           ctx.beginPath();
           ctx.arc(fx, fy, fingerR * mute, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(180, 140, 110, ${mute * 0.5})`;
+          ctx.fillStyle = `rgba(180,140,110,${(mute * 0.5).toFixed(3)})`;
           ctx.fill();
           ctx.beginPath();
           ctx.arc(fx, fy, fingerR * mute * 0.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(80, 50, 30, ${mute * 0.3})`;
+          ctx.fillStyle = `rgba(80,50,30,${(mute * 0.3).toFixed(3)})`;
           ctx.fill();
         }
 
@@ -662,8 +822,19 @@
       }
     }
 
+    // ─── Debug Mode ────────────────────────────────────────────────
+    let debugMode = false;
+    // Adjustable hit area params
+    let dbgStrMobileMult = 1.2;
+    let dbgStrMobileMin = 28;
+    let dbgStrDesktopMult = 0.7;
+    let dbgStrDesktopMin = 16;
+    let dbgKnobRadius = 12;
+    let dbgKnobPadding = 6;
+
     // ─── Tuning Knobs (on-canvas) ─────────────────────────────────
-    const TUNE_KNOB_RADIUS = 12;
+    let TUNE_KNOB_RADIUS = 12;
+    let TUNE_KNOB_HIT_PADDING = 6;
     let tuneKnobDrag = -1; // index of knob being dragged, -1 = none
     let tuneKnobDragStartY = 0;
     let tuneKnobDragStartVal = 0;
@@ -698,10 +869,86 @@
       }
     }
 
+    function drawDebugOverlay() {
+      if (!debugMode) return;
+      const colors = [
+        'rgba(255,80,80,0.25)',
+        'rgba(80,255,80,0.25)',
+        'rgba(80,80,255,0.25)',
+        'rgba(255,255,80,0.25)',
+        'rgba(255,80,255,0.25)',
+      ];
+      const strokeColors = [
+        'rgba(255,80,80,0.6)',
+        'rgba(80,255,80,0.6)',
+        'rgba(80,80,255,0.6)',
+        'rgba(255,255,80,0.6)',
+        'rgba(255,80,255,0.6)',
+      ];
+
+      // Draw string hit areas as thick translucent lines
+      for (let i = 0; i < 5; i++) {
+        const ha = stringHitAreas[i];
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(ha.x1, ha.y1);
+        ctx.lineTo(ha.x2, ha.y2);
+        ctx.strokeStyle = colors[i];
+        ctx.lineWidth = ha.hitRadius * 2;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        // Outline edge
+        ctx.strokeStyle = strokeColors[i];
+        ctx.lineWidth = 1.5;
+        // Top edge
+        const dx = ha.x2 - ha.x1, dy = ha.y2 - ha.y1;
+        const len = Math.hypot(dx, dy);
+        const nx = -dy / len * ha.hitRadius, ny = dx / len * ha.hitRadius;
+        ctx.beginPath();
+        ctx.moveTo(ha.x1 + nx, ha.y1 + ny);
+        ctx.lineTo(ha.x2 + nx, ha.y2 + ny);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ha.x1 - nx, ha.y1 - ny);
+        ctx.lineTo(ha.x2 - nx, ha.y2 - ny);
+        ctx.stroke();
+        // Label
+        ctx.fillStyle = strokeColors[i];
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillText(`S${i + 1}: r=${Math.round(ha.hitRadius)}`, ha.x1 + nx * 1.2, ha.y1 + ny * 1.2 - 4);
+        ctx.restore();
+      }
+
+      // Draw tuning knob hit areas
+      for (let i = 0; i < 5; i++) {
+        const kp = tuneKnobPositions[i];
+        const hitR = TUNE_KNOB_RADIUS + TUNE_KNOB_HIT_PADDING;
+        // Hit area circle
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, hitR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,160,60,0.2)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,160,60,0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        // Knob visual radius
+        ctx.beginPath();
+        ctx.arc(kp.x, kp.y, TUNE_KNOB_RADIUS, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,160,60,0.4)';
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Label
+        ctx.fillStyle = 'rgba(255,160,60,0.8)';
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.fillText(`K${i + 1}: ${TUNE_KNOB_RADIUS}+${TUNE_KNOB_HIT_PADDING}`, kp.x + hitR + 4, kp.y + 4);
+      }
+    }
+
     function hitTestTuneKnob(x, y) {
       for (let i = 0; i < 5; i++) {
         const kp = tuneKnobPositions[i];
-        if (Math.hypot(x - kp.x, y - kp.y) <= TUNE_KNOB_RADIUS + 6) return i;
+        if (Math.hypot(x - kp.x, y - kp.y) <= TUNE_KNOB_RADIUS + TUNE_KNOB_HIT_PADDING) return i;
       }
       return -1;
     }
@@ -724,30 +971,50 @@
       updatePlaybackRate(tuneKnobDrag);
       tuneSliders[tuneKnobDrag].value = semitones;
       tuneLabels[tuneKnobDrag].textContent = formatCents(semitones);
-      saveTuning();
+      debouncedSaveTuning();
+      requestRedraw();
     }
 
     // ─── Animation Loop ────────────────────────────────────────────
     let lastTime = 0;
+    let needsRedraw = true; // flag to request a redraw from outside the loop
+    const LOG_03 = Math.log(0.3); // pre-computed for vibration decay
+
+    function requestRedraw() { needsRedraw = true; }
+
+    function isAnimating() {
+      for (let i = 0; i < 5; i++) {
+        if (stringVibration[i] > 0) return true;
+        if (Math.abs(muteVisual[i] - (isStringMuted(i) ? 1 : 0)) > 0.01) return true;
+      }
+      return false;
+    }
 
     function animate(timestamp) {
       const time = timestamp / 1000;
       const dt = time - lastTime;
       lastTime = time;
 
-      ctx.save();
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, W, H);
-      ctx.translate(zoomX, zoomY);
-      ctx.scale(zoomScale, zoomScale);
-      drawBody();
-      drawStrings(time);
-      drawTuneKnobs();
-      ctx.restore();
+      const animating = isAnimating();
+
+      if (animating || needsRedraw) {
+        needsRedraw = false;
+
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.translate(zoomX, zoomY);
+        ctx.scale(zoomScale, zoomScale);
+        drawBody();
+        drawStrings(time);
+        drawTuneKnobs();
+        drawDebugOverlay();
+        ctx.restore();
+      }
 
       for (let i = 0; i < 5; i++) {
         if (stringVibration[i] > 0) {
-          stringVibration[i] *= Math.pow(0.3, dt);
+          stringVibration[i] *= Math.exp(LOG_03 * dt);
           if (stringVibration[i] < 0.005) stringVibration[i] = 0;
         }
         const target = isStringMuted(i) ? 1 : 0;
@@ -755,6 +1022,31 @@
       }
 
       requestAnimationFrame(animate);
+    }
+
+    // ─── Zoom Animation ─────────────────────────────────────────
+    function animateZoomIn() {
+      computeLayout();
+      const b = computeLayout.body;
+      if (!b) return;
+      // Target: center the strings area in view
+      const targetScale = H / (b.imgH * 0.5);
+      const targetX = -b.imgX * targetScale + (W - b.imgW * targetScale) * 0.3;
+      const targetY = -b.imgY * targetScale + (H - b.imgH * targetScale) * 0.5;
+      const startScale = zoomScale, startX = zoomX, startY = zoomY;
+      const duration = 400;
+      const startT = performance.now();
+      function step(now) {
+        const t = Math.min(1, (now - startT) / duration);
+        const ease = t * (2 - t); // ease-out
+        zoomScale = startScale + (targetScale - startScale) * ease;
+        zoomX = startX + (targetX - startX) * ease;
+        zoomY = startY + (targetY - startY) * ease;
+        clampZoom();
+        requestRedraw();
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
     }
 
     // ─── Pinch Zoom ──────────────────────────────────────────────
@@ -944,6 +1236,7 @@
         zoomY = p.midY - focusY * zoomScale;
 
         clampZoom();
+        requestRedraw();
         return;
       }
 
@@ -1161,6 +1454,7 @@
       zoomX = sx - (sx - zoomX) * (zoomScale / oldScale);
       zoomY = sy - (sy - zoomY) * (zoomScale / oldScale);
       clampZoom();
+      requestRedraw();
     }, { passive: false });
 
     // ─── Keyboard Input ────────────────────────────────────────────
@@ -1244,7 +1538,8 @@
         tuning[i] = Number(slider.value);
         updatePlaybackRate(i);
         val.textContent = formatCents(tuning[i]);
-        saveTuning();
+        debouncedSaveTuning();
+        requestRedraw();
       });
 
       row.appendChild(label);
@@ -1269,6 +1564,61 @@
       }
       saveTuning();
     });
+
+    // ─── Debug Panel ─────────────────────────────────────────────
+    const debugBtn = document.getElementById('debug-btn');
+    const debugPanel = document.getElementById('debug-panel');
+
+    debugBtn.addEventListener('click', () => {
+      debugMode = !debugMode;
+      debugPanel.classList.toggle('open', debugMode);
+      debugBtn.classList.toggle('active', debugMode);
+      requestRedraw();
+    });
+
+    // Prevent canvas interaction through panel
+    debugPanel.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+    debugPanel.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+    debugPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    function wireDebugSlider(id, getter, setter) {
+      const slider = document.getElementById(id);
+      const valEl = document.getElementById(id + '-val');
+      slider.value = getter();
+      valEl.textContent = getter();
+      slider.addEventListener('input', () => {
+        const v = Number(slider.value);
+        setter(v);
+        valEl.textContent = v;
+        computeLayout();
+        requestRedraw();
+      });
+    }
+
+    wireDebugSlider('dbg-str-mobile-mult',
+      () => dbgStrMobileMult,
+      (v) => { dbgStrMobileMult = v; }
+    );
+    wireDebugSlider('dbg-str-mobile-min',
+      () => dbgStrMobileMin,
+      (v) => { dbgStrMobileMin = v; }
+    );
+    wireDebugSlider('dbg-str-desktop-mult',
+      () => dbgStrDesktopMult,
+      (v) => { dbgStrDesktopMult = v; }
+    );
+    wireDebugSlider('dbg-str-desktop-min',
+      () => dbgStrDesktopMin,
+      (v) => { dbgStrDesktopMin = v; }
+    );
+    wireDebugSlider('dbg-knob-radius',
+      () => dbgKnobRadius,
+      (v) => { dbgKnobRadius = v; TUNE_KNOB_RADIUS = v; }
+    );
+    wireDebugSlider('dbg-knob-padding',
+      () => dbgKnobPadding,
+      (v) => { dbgKnobPadding = v; TUNE_KNOB_HIT_PADDING = v; }
+    );
 
     // ─── Start Overlay (mobile audio unlock) ──────────────────────
     const startOverlay = document.getElementById('start-overlay');
