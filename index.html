@@ -642,6 +642,7 @@
       isMobile = matchMedia('(pointer: coarse)').matches;
       mobilePortrait = isMobile && vh > vw;
       instrumentTransform.rotation = mobilePortrait ? 4.5 : 9.5;
+      if (!mobilePortrait) instrumentTransform.scale = 0.98;
 
       if (mobilePortrait) {
         // Swap dimensions — canvas renders in landscape, CSS rotates it
