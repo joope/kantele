@@ -77,45 +77,6 @@
 
 
 
-    #start-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      background: rgba(0, 0, 0, 0.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      opacity: 1;
-      transition: opacity 0.4s ease;
-    }
-
-    #start-overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #start-overlay .start-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 28px;
-      padding: 24px;
-      text-align: center;
-    }
-
-    #start-overlay p {
-      color: rgba(255, 255, 255, 0.55);
-      font: 14px/1.5 system-ui, sans-serif;
-      max-width: 260px;
-    }
-
-    #start-overlay {
-      cursor: pointer;
-    }
-
-
     #help-btn {
       position: fixed;
       top: 12px;
@@ -264,20 +225,6 @@
 <body>
 
   <canvas id="kantele" aria-label="Kantele – touch or click the strings to play"></canvas>
-
-  <div id="start-overlay">
-    <div class="start-content">
-      <p>Tervetuloa soittamaan kanteletta.<br>Welcome to play kantele.</p>
-      <p style="color: rgba(255,255,255,0.35); font-size: 12px;">Press anywhere to start playing</p>
-      <p><a href="https://iidamariakuronen.com" target="_blank" rel="noopener"
-          style="color: rgba(255,255,255,0.35); font-size: 11px; text-decoration: none;">Want to learn more about the
-          kantele? Connect with a professional musician here! →</a></p>
-    </div>
-  </div>
-
-  <div id="learn-link"><a href="https://iidamariakuronen.com" target="_blank" rel="noopener">Want to learn kantele?
-      Connect with a teacher here→</a>
-  </div>
 
   <button id="help-btn" aria-label="Help">?</button>
 
@@ -1389,9 +1336,16 @@
     const helpBtn = document.getElementById('help-btn');
     const helpPopup = document.getElementById('help-popup');
     helpBtn.addEventListener('click', () => helpPopup.classList.toggle('open'));
-    document.getElementById('help-play-btn').addEventListener('click', () => helpPopup.classList.remove('open'));
-    helpPopup.addEventListener('click', (e) => {
-      if (e.target.tagName !== 'A') helpPopup.classList.remove('open');
+    document.getElementById('help-play-btn').addEventListener('click', async () => {
+      ensureAudio();
+      await decodeSamples();
+      helpPopup.classList.remove('open');
+    });
+    helpPopup.addEventListener('click', async (e) => {
+      if (e.target.tagName === 'A') return;
+      ensureAudio();
+      await decodeSamples();
+      helpPopup.classList.remove('open');
     });
     helpPopup.addEventListener('touchstart', (e) => {
       if (e.target.tagName !== 'A') e.stopPropagation();
@@ -1512,20 +1466,8 @@
       }, true);
     }
 
-    // ─── Start Overlay (mobile audio unlock) ──────────────────────
-    const startOverlay = document.getElementById('start-overlay');
-    if (debugMode || !matchMedia('(pointer: coarse)').matches) {
-      // Desktop or debug mode — no overlay needed, remove immediately
-      startOverlay.remove();
-    } else {
-      startOverlay.addEventListener('click', async (e) => {
-        if (e.target.tagName === 'A') return; // let links work
-        ensureAudio();
-        await decodeSamples();
-        startOverlay.classList.add('hidden');
-        setTimeout(() => startOverlay.remove(), 400);
-      });
-    }
+    // ─── Show help popup on first visit ────────────────────────────
+    helpPopup.classList.add('open');
 
     // ─── Prevent browser zoom gestures ─────────────────────────────
     document.addEventListener('gesturestart', (e) => e.preventDefault());
