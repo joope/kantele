@@ -121,6 +121,7 @@
     }
 
     #help-popup .help-card {
+      position: relative;
       background: rgba(30, 28, 24, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 14px;
@@ -129,6 +130,31 @@
       width: calc(100% - 32px);
       color: #ccc;
       font: 13px/1.5 system-ui, sans-serif;
+    }
+
+    #help-popup .help-card .help-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+      padding: 0;
+    }
+
+    #help-popup .help-card .help-close:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
     }
 
     #help-popup .help-card h2 {
@@ -230,6 +256,7 @@
 
   <div id="help-popup">
     <div class="help-card">
+      <button class="help-close" id="help-close-btn">&times;</button>
       <h2>Kantele - How to play</h2>
       <ul>
         <li>Swipe across strings to pluck or strum</li>
@@ -1342,6 +1369,11 @@
     const helpPopup = document.getElementById('help-popup');
     helpBtn.addEventListener('click', () => helpPopup.classList.toggle('open'));
     document.getElementById('help-play-btn').addEventListener('click', async () => {
+      ensureAudio();
+      await decodeSamples();
+      helpPopup.classList.remove('open');
+    });
+    document.getElementById('help-close-btn').addEventListener('click', async () => {
       ensureAudio();
       await decodeSamples();
       helpPopup.classList.remove('open');
