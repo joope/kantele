@@ -66,6 +66,7 @@
       overflow: hidden;
       -webkit-user-select: none;
       user-select: none;
+      touch-action: none;
     }
 
     canvas#kantele {
@@ -212,42 +213,6 @@
       cursor: pointer;
     }
 
-    #rotate-prompt {
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: rgba(0, 0, 0, 0.92);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 20px;
-      text-align: center;
-      padding: 24px;
-    }
-
-    #rotate-prompt .rotate-icon {
-      font-size: 48px;
-      animation: rotate-hint 2s ease-in-out infinite;
-    }
-
-    @keyframes rotate-hint {
-
-      0%,
-      100% {
-        transform: rotate(0deg);
-      }
-
-      50% {
-        transform: rotate(90deg);
-      }
-    }
-
-    #rotate-prompt p {
-      color: rgba(255, 255, 255, 0.7);
-      font: 15px/1.5 system-ui, sans-serif;
-      max-width: 260px;
-    }
 
     #learn-link {
       position: fixed;
@@ -274,22 +239,10 @@
       color: rgba(255, 255, 255, 0.7);
       background: rgba(255, 255, 255, 0.1);
     }
-
-    @media (pointer: coarse) and (orientation: portrait) {
-      #rotate-prompt {
-        display: flex;
-      }
-    }
-
   </style>
 </head>
 
 <body>
-
-  <div id="rotate-prompt">
-    <div class="rotate-icon">📱</div>
-    <p>Käännä puhelin vaakatasoon.<br>Please rotate your phone to landscape mode.</p>
-  </div>
 
   <canvas id="kantele" aria-label="Kantele – touch or click the strings to play"></canvas>
 
@@ -320,7 +273,7 @@
     let audioCtx = null;
 
     // ─── Sample Files ──────────────────────────────────────────────
-    const SAMPLE_FILES = ['A_5.mp3', 'G_4.mp3', 'F%23_3.mp3', 'E_2.mp3', 'D.mp3'];
+    const SAMPLE_FILES = ['D.mp3', 'E_2.mp3', 'F%23_3.mp3', 'G_4.mp3', 'A_5.mp3'];
     const sampleBuffers = [null, null, null, null, null];
     const sampleRawData = [null, null, null, null, null];
     // Debounced save for tuning
@@ -384,7 +337,7 @@
     });
 
     // ─── Tuning ──────────────────────────────────────────────────
-    const STRING_NAMES = ['A', 'G', 'F♯', 'E', 'D'];
+    const STRING_NAMES = ['D', 'E', 'F♯', 'G', 'A'];
     const BASE_SEMITONES = [0, 0, 0, 0, 0]; // semitone offset per string
     let tuning = [...BASE_SEMITONES];
 
@@ -413,27 +366,113 @@
 
     // ─── Kantele Image ────────────────────────────────────────────
     const kanteleImg = new Image();
-    kanteleImg.src = 'kantele.png';
+    kanteleImg.src = 'kantele_v6.png';
     let imgLoaded = false;
     kanteleImg.onload = () => { imgLoaded = true; requestRedraw(); };
+
+    // ─── Background Texture ──────────────────────────────────────
+    const bgImg = new Image();
+    bgImg.src = 'texture_2.png';
+    let bgLoaded = false;
+    bgImg.onload = () => { bgLoaded = true; requestRedraw(); };
+
+    // ─── Instrument Transform ─────────────────────────────────────
+    // scale: 1 = fit to screen width, offsetX/Y: fraction of screen, rotation: degrees
+    const instrumentTransform = { scale: 0.99, offsetX: -0.016, offsetY: 0.024, rotation: 9.5 };
 
     // ─── String Positions (image-relative fractions) ──────────────
     const stringPositions = {
       bridge: [
-        { x: 0.2025381068046608, y: 0.44744621828396547 },
-        { x: 0.2025381068046608, y: 0.48149514728308646 },
-        { x: 0.20324215862287462, y: 0.5125832998475012 },
-        { x: 0.20394621044108843, y: 0.5466322288466222 },
-        { x: 0.20465026225930227, y: 0.577720381411037 },
+        { x: 0.8513403458530613, y: 0.33381062469688166 },
+        { x: 0.8515232325304376, y: 0.37786960741767495 },
+        { x: 0.8518617218279767, y: 0.42043604505498755 },
+        { x: 0.852747625121056, y: 0.46353873947683394 },
+        { x: 0.8530362800378654, y: 0.5049609612280171 },
       ],
       peg: [
-        { x: 0.6749568768261344, y: 0.35270137237336807 },
-        { x: 0.7228324004646742, y: 0.4089561246327853 },
-        { x: 0.7664836131939311, y: 0.46373048867484945 },
-        { x: 0.8129510331960432, y: 0.5229460173689728 },
-        { x: 0.8608265568345831, y: 0.5806811578457431 },
+        { x: 0.13422591771617554, y: 0.3399992679423589 },
+        { x: 0.18468874741656627, y: 0.42227353322205957 },
+        { x: 0.2346947171896111, y: 0.49050903028759824 },
+        { x: 0.28439220718786995, y: 0.5621370121095425 },
+        { x: 0.33541516684293154, y: 0.6376961694811449 },
       ],
     };
+
+    // ─── Debug Mode ────────────────────────────────────────────────
+    const debugMode = new URLSearchParams(location.search).has('debug');
+    let debugDrag = null; // { type: 'bridge'|'peg', index: number }
+
+    function drawDebugPoints() {
+      const b = computeLayout.body;
+      if (!b) return;
+      const { imgW, imgH, imgX, imgY } = b;
+      const r = 8;
+
+      for (const type of ['bridge', 'peg']) {
+        const color = type === 'bridge' ? '#ff3333' : '#33ff33';
+        stringPositions[type].forEach((p, i) => {
+          const pt = imgToCanvas(p.x, p.y, imgW, imgH, imgX, imgY);
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.globalAlpha = 0.8;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = '#fff';
+          ctx.font = '12px monospace';
+          ctx.fillText(`${type[0].toUpperCase()}${i}`, pt.x + 12, pt.y + 4);
+        });
+      }
+    }
+
+    function debugHitTest(mx, my) {
+      const b = computeLayout.body;
+      if (!b) return null;
+      const { imgW, imgH, imgX, imgY } = b;
+      const hitR = 15;
+      for (const type of ['bridge', 'peg']) {
+        for (let i = 0; i < stringPositions[type].length; i++) {
+          const p = stringPositions[type][i];
+          const pt = imgToCanvas(p.x, p.y, imgW, imgH, imgX, imgY);
+          if (Math.hypot(mx - pt.x, my - pt.y) < hitR) {
+            return { type, index: i };
+          }
+        }
+      }
+      return null;
+    }
+
+    function debugCopyPositions() {
+      const json = JSON.stringify(stringPositions, null, 2);
+      navigator.clipboard.writeText(json).then(() => {
+        debugStatus.textContent = 'Copied!';
+        setTimeout(() => { debugStatus.textContent = ''; }, 1500);
+      });
+    }
+
+    function debugSavePositions() {
+      // Update the stringPositions in-place (already done via drag),
+      // just copy the code-ready output
+      let code = 'const stringPositions = {\n  bridge: [\n';
+      stringPositions.bridge.forEach((p, i) => {
+        code += `    { x: ${p.x}, y: ${p.y} },\n`;
+      });
+      code += '  ],\n  peg: [\n';
+      stringPositions.peg.forEach((p, i) => {
+        code += `    { x: ${p.x}, y: ${p.y} },\n`;
+      });
+      code += '  ],\n};';
+      navigator.clipboard.writeText(code).then(() => {
+        debugStatus.textContent = 'Code copied!';
+        setTimeout(() => { debugStatus.textContent = ''; }, 1500);
+      });
+    }
+
+    // Debug UI — initialized later after canvas/vars are ready
+    let debugStatus;
 
     // ─── Synthesis ─────────────────────────────────────────────────
     function muteString(idx, pos) {
@@ -505,64 +544,93 @@
     let stringEndpoints = [];
     let stringHitAreas = [];
     let tuneKnobPositions = [];
+    let mobilePortrait = false;
+
     function resize() {
-      W = window.innerWidth;
-      H = window.innerHeight;
-      canvas.width = W * dpr;
-      canvas.height = H * dpr;
-      canvas.style.width = W + 'px';
-      canvas.style.height = H + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
       isMobile = matchMedia('(pointer: coarse)').matches;
-      zoomScale = 1; zoomX = 0; zoomY = 0;
+      mobilePortrait = isMobile && vh > vw;
+
+      if (mobilePortrait) {
+        // Swap dimensions — canvas renders in landscape, CSS rotates it
+        W = vh;
+        H = vw;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        canvas.style.transform = 'rotate(90deg)';
+        canvas.style.transformOrigin = 'top left';
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0px';
+        canvas.style.left = vw + 'px';
+      } else {
+        W = vw;
+        H = vh;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        canvas.style.transform = '';
+        canvas.style.transformOrigin = '';
+        canvas.style.position = '';
+        canvas.style.top = '';
+        canvas.style.left = '';
+      }
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       computeLayout();
       requestRedraw();
     }
 
-    let playZoomed = false; // true after user taps play on mobile
+    // Transform a point from image-relative coords to canvas coords
+    function imgToCanvas(fx, fy, imgW, imgH, imgX, imgY) {
+      // Point relative to image center
+      const lx = (fx - 0.5) * imgW;
+      const ly = (fy - 0.5) * imgH;
+      // Rotate
+      const rad = instrumentTransform.rotation * Math.PI / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      const rx = lx * cos - ly * sin;
+      const ry = lx * sin + ly * cos;
+      // Translate to canvas
+      const cx = imgX + imgW / 2 + rx;
+      const cy = imgY + imgH / 2 + ry;
+      return { x: cx, y: cy };
+    }
 
     function computeLayout() {
-      const imgAspect = 4096 / 1948; // ~2.1:1
+      const imgAspect = kanteleImg.naturalWidth / kanteleImg.naturalHeight;
+      const t = instrumentTransform;
 
-      let imgW, imgH;
+      // Fit to screen width, then apply scale
+      let imgW = W * t.scale;
+      let imgH = imgW / imgAspect;
 
-      if (isMobile && H > W && playZoomed) {
-        // Mobile portrait zoomed: fill screen height
-        imgH = H;
-        imgW = imgH * imgAspect;
-      } else {
-        // Default: fit to screen width (shows whole kantele)
-        imgW = W;
-        imgH = imgW / imgAspect;
-      }
-
-      const imgX = (W - imgW) / 2;
-      const imgY = (H - imgH) / 2;
+      // Center + offset
+      const imgX = (W - imgW) / 2 + t.offsetX * W;
+      const imgY = (H - imgH) / 2 + t.offsetY * H;
 
       const pos = stringPositions;
       stringEndpoints = [];
       stringHitAreas = [];
 
       for (let i = 0; i < 5; i++) {
-        const x1 = imgX + pos.bridge[i].x * imgW;
-        const y1 = imgY + pos.bridge[i].y * imgH;
-        const x2 = imgX + pos.peg[i].x * imgW;
-        const y2 = imgY + pos.peg[i].y * imgH;
+        const p1 = imgToCanvas(pos.bridge[i].x, pos.bridge[i].y, imgW, imgH, imgX, imgY);
+        const p2 = imgToCanvas(pos.peg[i].x, pos.peg[i].y, imgW, imgH, imgX, imgY);
 
-        stringEndpoints.push({ x1, y1, x2, y2 });
+        stringEndpoints.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
 
         const gap = imgH * 0.06;
         const hitR = isMobile ? Math.max(gap * 1.2, 28) : Math.max(gap * 0.7, 16);
-        stringHitAreas.push({ x1, y1, x2, y2, hitRadius: hitR });
+        stringHitAreas.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, hitRadius: hitR });
       }
 
       tuneKnobPositions = [];
       for (let i = 0; i < 5; i++) {
-        // Place knobs at the peg positions on the image
-        tuneKnobPositions.push({
-          x: imgX + pos.peg[i].x * imgW,
-          y: imgY + pos.peg[i].y * imgH,
-        });
+        const p = imgToCanvas(pos.peg[i].x, pos.peg[i].y, imgW, imgH, imgX, imgY);
+        tuneKnobPositions.push(p);
       }
 
       computeLayout.body = { imgW, imgH, imgX, imgY };
@@ -572,12 +640,19 @@
       const b = computeLayout.body;
       if (!b || !imgLoaded) return;
       const { imgW, imgH, imgX, imgY } = b;
+      const rad = instrumentTransform.rotation * Math.PI / 180;
+      const cx = imgX + imgW / 2;
+      const cy = imgY + imgH / 2;
 
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur = 30;
-      ctx.shadowOffsetY = 16;
-      ctx.drawImage(kanteleImg, imgX, imgY, imgW, imgH);
+      ctx.translate(cx, cy);
+      ctx.rotate(rad);
+      // Draw a soft shadow beneath the kantele
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 100;
+      ctx.shadowOffsetX = 40;
+      ctx.drawImage(kanteleImg, -imgW / 2, -imgH / 2, imgW, imgH);
       ctx.restore();
     }
 
@@ -591,7 +666,7 @@
     const _offsetPoints = Array.from({ length: STRING_STEPS + 1 }, () => ({ x: 0, y: 0 }));
 
     // Pre-computed shadow color strings
-    const _shadowColors = [0, 1, 2, 3].map(s => `rgba(100,50,10,${0.06 - s * 0.01})`);
+    const _shadowColors = [0, 1, 2, 3].map(s => `rgba(90,60,5,${0.06 - s * 0.03})`);
 
     function computeStringPath(out, ep, dx, dy, nx, ny, vib, time, i) {
       for (let s = 0; s <= STRING_STEPS; s++) {
@@ -621,12 +696,14 @@
 
     function drawStrings(time) {
       const nPts = STRING_STEPS + 1;
+      const b = computeLayout.body;
+      const sizeScale = b ? b.imgW / 1000 : 1;
 
       for (let i = 0; i < 5; i++) {
         const ep = stringEndpoints[i];
         const vib = stringVibration[i];
         const mute = muteVisual[i];
-        const thickness = 0.4 + i * 0.28;
+        const thickness = (0.4 + (4 - i) * 0.28) * sizeScale;
 
         ctx.save();
 
@@ -640,14 +717,14 @@
         computeStringPath(points, ep, dx, dy, nx, ny, vib, time, i);
 
         // Shadow underneath the string (fewer passes on mobile)
-        const shadowDx = nx * 2;
-        const shadowDy = ny * 2 + 16;
+        const shadowDx = nx * 2 * sizeScale - 10;
+        const shadowDy = ny * 2 * sizeScale + 30 * sizeScale;
         const shadowStart = isMobile ? 1 : 3;
         for (let s = shadowStart; s >= 0; s--) {
-          const spread = s * 2.5;
+          const spread = s * 3.0 * sizeScale;
           tracePathOffset(points, nPts, shadowDx, shadowDy);
           ctx.strokeStyle = _shadowColors[s];
-          ctx.lineWidth = thickness + 2 + spread * 2;
+          ctx.lineWidth = thickness + 2 * sizeScale + spread * 2;
           ctx.lineCap = 'round';
           ctx.stroke();
         }
@@ -677,14 +754,14 @@
 
         // Vibration glow (fewer passes on mobile)
         if (vib > 0.05) {
-          const glowRadius = vib * 6;
+          const glowRadius = vib * 6 * sizeScale;
           const glowColor = `rgba(200,210,220,${(vib * 0.1).toFixed(3)})`;
           const glowStart = isMobile ? 1 : 3;
           for (let g = glowStart; g >= 0; g--) {
             const spread = g * glowRadius * 0.5;
             tracePath(points, nPts);
             ctx.strokeStyle = glowColor;
-            ctx.lineWidth = thickness + vib * 12 + spread * 2;
+            ctx.lineWidth = thickness + vib * 12 * sizeScale + spread * 2;
             ctx.lineCap = 'round';
             ctx.stroke();
           }
@@ -695,7 +772,7 @@
           const ft = mutePos[i];
           const fx = ep.x1 + dx * ft;
           const fy = ep.y1 + dy * ft;
-          const fingerR = isMobile ? 14 : 8 + (thickness - 1) * 2;
+          const fingerR = isMobile ? 14 * sizeScale : (8 + (thickness - 1) * 2) * sizeScale;
           ctx.beginPath();
           ctx.arc(fx, fy, fingerR * mute, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(180,140,110,${(mute * 0.5).toFixed(3)})`;
@@ -711,17 +788,40 @@
     }
 
     // ─── Tuning Knobs (on-canvas) ─────────────────────────────────
-    const TUNE_KNOB_RADIUS = 12;
+    const TUNE_KNOB_BASE_RADIUS = 12;
     let tuneKnobDrag = -1; // index of knob being dragged, -1 = none
     let tuneKnobDragStartY = 0;
     let tuneKnobDragStartVal = 0;
     let tuneKnobDragTouchId = null; // touch identifier for knob drag
 
+    function tuneKnobRadius() {
+      const b = computeLayout.body;
+      // Scale relative to image width on screen (base assumes ~1000px wide)
+      return b ? TUNE_KNOB_BASE_RADIUS * (b.imgW / 1000) : TUNE_KNOB_BASE_RADIUS;
+    }
+
     function drawTuneKnobs() {
       for (let i = 0; i < 5; i++) {
         const kp = tuneKnobPositions[i];
-        const r = TUNE_KNOB_RADIUS;
+        const r = tuneKnobRadius();
         const active = tuneKnobDrag === i;
+
+        // Pin shadow — elevated ~2-3cm so shadow is offset and widens downward
+        const shadowOffX = r * 0.0;
+        const shadowOffY = r * 1;
+        const shadowR = r * 0.4;
+        ctx.save();
+        ctx.translate(kp.x + shadowOffX, kp.y + shadowOffY);
+        ctx.scale(1, 6); // elongate vertically to simulate perspective
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, shadowR);
+        grad.addColorStop(0, 'rgba(0,0,0,0.35)');
+        grad.addColorStop(0.5, 'rgba(0,0,0,0.15)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(0, 0, shadowR, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
 
         // Solid knob
         ctx.beginPath();
@@ -733,7 +833,8 @@
         ctx.stroke();
 
         // Indicator line — points in direction matching the tuning value
-        const angle = -Math.PI / 2 + tuning[i] * (Math.PI / 12);
+        const baseAngle = mobilePortrait ? 0 : -Math.PI / 2;
+        const angle = baseAngle + tuning[i] * (Math.PI / 12);
         const ix = kp.x + Math.cos(angle) * r * 0.65;
         const iy = kp.y + Math.sin(angle) * r * 0.65;
         ctx.beginPath();
@@ -748,7 +849,7 @@
 
     function hitTestTuneKnob(x, y) {
       // Use the same hit radius as strings for consistent touch targets
-      const hitR = stringHitAreas.length > 0 ? stringHitAreas[0].hitRadius : TUNE_KNOB_RADIUS + 6;
+      const hitR = stringHitAreas.length > 0 ? stringHitAreas[0].hitRadius : tuneKnobRadius() + 6;
       for (let i = 0; i < 5; i++) {
         const kp = tuneKnobPositions[i];
         if (Math.hypot(x - kp.x, y - kp.y) <= hitR) return i;
@@ -770,7 +871,15 @@
       const dx = x - tuneKnobDragStartX;
       const dy = tuneKnobDragStartY - y;
       // Use whichever axis has more movement (right/up = higher pitch)
-      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      // On mobile portrait, canvas is rotated so swap perceived axes
+      let delta;
+      if (mobilePortrait) {
+        const rdx = tuneKnobDragStartY - y; // screen up → canvas -Y
+        const rdy = x - tuneKnobDragStartX; // screen right → canvas +X
+        delta = Math.abs(rdx) > Math.abs(rdy) ? rdx : rdy;
+      } else {
+        delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      }
       const semitones = Math.max(-12, Math.min(12, tuneKnobDragStartVal + delta * 0.05));
       tuning[tuneKnobDrag] = semitones;
       updatePlaybackRate(tuneKnobDrag);
@@ -792,7 +901,7 @@
     // ─── Animation Loop ────────────────────────────────────────────
     let lastTime = 0;
     let needsRedraw = true; // flag to request a redraw from outside the loop
-    const LOG_03 = Math.log(0.3); // pre-computed for vibration decay
+    const LOG_03 = Math.log(0.3) / 4; // pre-computed for vibration decay (slowed 4x)
 
     function requestRedraw() { needsRedraw = true; }
 
@@ -817,11 +926,13 @@
         ctx.save();
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, W, H);
-        ctx.translate(zoomX, zoomY);
-        ctx.scale(zoomScale, zoomScale);
+        if (bgLoaded) {
+          ctx.drawImage(bgImg, 0, 0, W, H);
+        }
         drawBody();
         drawStrings(time);
         drawTuneKnobs();
+        if (debugMode) drawDebugPoints();
         ctx.restore();
       }
 
@@ -837,54 +948,8 @@
       requestAnimationFrame(animate);
     }
 
-    // ─── Zoom Animation ─────────────────────────────────────────
-    function animateZoomIn() {
-      computeLayout();
-      const b = computeLayout.body;
-      if (!b) return;
-      // Target: center the strings area in view
-      const targetScale = H / (b.imgH * 0.5);
-      const targetX = -b.imgX * targetScale + (W - b.imgW * targetScale) * 0.3;
-      const targetY = -b.imgY * targetScale + (H - b.imgH * targetScale) * 0.5;
-      const startScale = zoomScale, startX = zoomX, startY = zoomY;
-      const duration = 400;
-      const startT = performance.now();
-      function step(now) {
-        const t = Math.min(1, (now - startT) / duration);
-        const ease = t * (2 - t); // ease-out
-        zoomScale = startScale + (targetScale - startScale) * ease;
-        zoomX = startX + (targetX - startX) * ease;
-        zoomY = startY + (targetY - startY) * ease;
-        clampZoom();
-        requestRedraw();
-        if (t < 1) requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-    }
-
-    // ─── Pinch Zoom ──────────────────────────────────────────────
-    let zoomScale = 1;
-    let zoomX = 0, zoomY = 0; // pan offset in screen pixels
-    let pinchActive = false;
-    let pinchStartDist = 0;
-    let pinchStartScale = 1;
-    let pinchStartMidX = 0, pinchStartMidY = 0;
-    let pinchStartZoomX = 0, pinchStartZoomY = 0;
-
     function screenToCanvas(sx, sy) {
-      return {
-        x: (sx - zoomX) / zoomScale,
-        y: (sy - zoomY) / zoomScale,
-      };
-    }
-
-    function clampZoom() {
-      zoomScale = Math.max(1, Math.min(5, zoomScale));
-      // Clamp pan so we don't scroll past the canvas edges
-      const maxPanX = (zoomScale - 1) * W / zoomScale;
-      const maxPanY = (zoomScale - 1) * H / zoomScale;
-      zoomX = Math.max(-maxPanX * zoomScale, Math.min(0, zoomX));
-      zoomY = Math.max(-maxPanY * zoomScale, Math.min(0, zoomY));
+      return { x: sx, y: sy };
     }
 
     // ─── Hit Testing ───────────────────────────────────────────────
@@ -956,6 +1021,10 @@
     const activeTouches = new Map();
 
     function getScreenTouchPos(touch) {
+      if (mobilePortrait) {
+        // Canvas is rotated 90deg CW: remap screen coords to canvas coords
+        return { x: touch.clientY, y: H - touch.clientX };
+      }
       const rect = canvas.getBoundingClientRect();
       return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
     }
@@ -963,16 +1032,6 @@
     function getTouchPos(touch) {
       const screen = getScreenTouchPos(touch);
       return screenToCanvas(screen.x, screen.y);
-    }
-
-    function getPinchInfo(touches) {
-      const a = getScreenTouchPos(touches[0]);
-      const b = getScreenTouchPos(touches[1]);
-      return {
-        dist: Math.hypot(a.x - b.x, a.y - b.y),
-        midX: (a.x + b.x) / 2,
-        midY: (a.y + b.y) / 2,
-      };
     }
 
     canvas.addEventListener('touchstart', (e) => {
@@ -1017,28 +1076,6 @@
         activeTouches.set(touch.identifier, info);
       }
 
-      // If 2+ fingers → start pinch, but only if no string is being touched or muted
-      if (e.touches.length >= 2) {
-        if (!pinchActive) {
-          const anyMuted = stringMuteCount.some(c => c > 0);
-          let anyOnString = false;
-          for (const [, info] of activeTouches) {
-            if (info.hitString >= 0 || info.mutedString >= 0) { anyOnString = true; break; }
-          }
-          if (!anyMuted && !anyOnString) {
-            const p = getPinchInfo(e.touches);
-            pinchStartDist = p.dist;
-            pinchStartScale = zoomScale;
-            pinchStartMidX = p.midX;
-            pinchStartMidY = p.midY;
-            pinchStartZoomX = zoomX;
-            pinchStartZoomY = zoomY;
-            pinchActive = true;
-          }
-        }
-        if (pinchActive) return;
-      }
-
       // Start mute timers for fingers on strings
       for (const touch of e.changedTouches) {
         const info = activeTouches.get(touch.identifier);
@@ -1056,32 +1093,6 @@
 
     canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
-
-      if (pinchActive && e.touches.length >= 2) {
-        const p = getPinchInfo(e.touches);
-        const newScale = Math.max(1, Math.min(5, pinchStartScale * (p.dist / pinchStartDist)));
-
-        // Zoom toward pinch midpoint
-        // The point under the pinch midpoint should stay fixed
-        const focusX = (pinchStartMidX - pinchStartZoomX) / pinchStartScale;
-        const focusY = (pinchStartMidY - pinchStartZoomY) / pinchStartScale;
-
-        zoomScale = newScale;
-        zoomX = p.midX - focusX * zoomScale;
-        zoomY = p.midY - focusY * zoomScale;
-
-        // Also allow panning
-        zoomX += (p.midX - pinchStartMidX) - (pinchStartMidX - pinchStartZoomX) * (newScale / pinchStartScale - 1);
-        zoomY += (p.midY - pinchStartMidY) - (pinchStartMidY - pinchStartZoomY) * (newScale / pinchStartScale - 1);
-
-        // Simpler: just compute directly
-        zoomX = p.midX - focusX * zoomScale;
-        zoomY = p.midY - focusY * zoomScale;
-
-        clampZoom();
-        requestRedraw();
-        return;
-      }
 
       for (const touch of e.changedTouches) {
         const info = activeTouches.get(touch.identifier);
@@ -1157,10 +1168,6 @@
         activeTouches.delete(touch.identifier);
       }
 
-      // End pinch when fewer than 2 fingers remain
-      if (e.touches.length < 2) {
-        pinchActive = false;
-      }
     });
 
     canvas.addEventListener('touchcancel', (e) => {
@@ -1172,7 +1179,6 @@
         }
         activeTouches.delete(touch.identifier);
       }
-      if (e.touches.length < 2) pinchActive = false;
     });
 
     // ─── Mouse Input ───────────────────────────────────────────────
@@ -1280,36 +1286,20 @@
           pluckString(mouseHitString, 0.5 + Math.random() * 0.2);
         }
       }
-      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;     });
+      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;
+    });
     canvas.addEventListener('mouseleave', () => {
       tuneKnobDrag = -1;
       if (mouseMuteTimer) { clearTimeout(mouseMuteTimer); mouseMuteTimer = null; }
       if (mouseMutedString >= 0) { unmuteString(mouseMutedString); mouseMutedString = -1; }
-      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;     });
+      mouseDown = false; mouseLastPlucked = -1; mouseHitString = -1;
+    });
 
     canvas.addEventListener('dblclick', (e) => {
       const pos = getMousePos(e);
       const knobHit = hitTestTuneKnob(pos.x, pos.y);
       if (knobHit >= 0) resetTuneKnob(knobHit);
     });
-
-    // ─── Scroll-wheel Zoom (desktop) ────────────────────────────
-    canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const sx = e.clientX - rect.left;
-      const sy = e.clientY - rect.top;
-
-      const oldScale = zoomScale;
-      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      zoomScale = Math.max(1, Math.min(5, zoomScale * factor));
-
-      // Zoom toward cursor
-      zoomX = sx - (sx - zoomX) * (zoomScale / oldScale);
-      zoomY = sy - (sy - zoomY) * (zoomScale / oldScale);
-      clampZoom();
-      requestRedraw();
-    }, { passive: false });
 
     // ─── Keyboard Input ────────────────────────────────────────────
     const MUTE_KEYS = ['q', 'w', 'e', 'r', 't'];
@@ -1419,10 +1409,123 @@
       saveTuning();
     });
 
+    // ─── Debug UI Init ─────────────────────────────────────────────
+    if (debugMode) {
+      const panel = document.createElement('div');
+      panel.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;background:rgba(0,0,0,0.85);color:#fff;padding:12px;border-radius:8px;font:13px monospace;display:flex;flex-direction:column;gap:8px;max-height:90vh;overflow-y:auto;';
+      const sliderStyle = 'width:100%;margin:0;';
+      const t = instrumentTransform;
+      panel.innerHTML = `
+        <div style="font-weight:bold;margin-bottom:4px;">Instrument Transform</div>
+        <label>Scale: <span id="debug-scale-val">${t.scale.toFixed(2)}</span>
+          <input type="range" id="debug-scale" min="0.1" max="3" step="0.01" value="${t.scale}" style="${sliderStyle}">
+        </label>
+        <label>Offset X: <span id="debug-ox-val">${t.offsetX.toFixed(3)}</span>
+          <input type="range" id="debug-ox" min="-0.5" max="0.5" step="0.001" value="${t.offsetX}" style="${sliderStyle}">
+        </label>
+        <label>Offset Y: <span id="debug-oy-val">${t.offsetY.toFixed(3)}</span>
+          <input type="range" id="debug-oy" min="-0.5" max="0.5" step="0.001" value="${t.offsetY}" style="${sliderStyle}">
+        </label>
+        <label>Rotation: <span id="debug-rot-val">${t.rotation.toFixed(1)}&deg;</span>
+          <input type="range" id="debug-rot" min="-180" max="180" step="0.5" value="${t.rotation}" style="${sliderStyle}">
+        </label>
+        <button id="debug-copy-transform" style="padding:6px;cursor:pointer;border-radius:4px;border:1px solid #555;background:#333;color:#fff;">Copy Transform</button>
+        <hr style="border-color:#444;margin:4px 0;">
+        <div style="font-weight:bold;">String Positions</div>
+        <div><span style="color:#ff3333;">&#9679;</span> Bridge &nbsp; <span style="color:#33ff33;">&#9679;</span> Peg</div>
+        <div style="font-size:11px;color:#aaa;">Drag dots to reposition</div>
+        <button id="debug-copy" style="padding:6px;cursor:pointer;border-radius:4px;border:1px solid #555;background:#333;color:#fff;">Copy Strings JSON</button>
+        <button id="debug-copy-code" style="padding:6px;cursor:pointer;border-radius:4px;border:1px solid #555;background:#333;color:#fff;">Copy Strings Code</button>
+        <span id="debug-status" style="color:#0f0;font-size:11px;"></span>
+      `;
+      document.body.appendChild(panel);
+      debugStatus = document.getElementById('debug-status');
+      document.getElementById('debug-copy').addEventListener('click', debugCopyPositions);
+      document.getElementById('debug-copy-code').addEventListener('click', debugSavePositions);
+
+      // Transform sliders
+      const scaleSlider = document.getElementById('debug-scale');
+      const oxSlider = document.getElementById('debug-ox');
+      const oySlider = document.getElementById('debug-oy');
+      const rotSlider = document.getElementById('debug-rot');
+      const scaleVal = document.getElementById('debug-scale-val');
+      const oxVal = document.getElementById('debug-ox-val');
+      const oyVal = document.getElementById('debug-oy-val');
+      const rotVal = document.getElementById('debug-rot-val');
+
+      function onTransformChange() {
+        instrumentTransform.scale = parseFloat(scaleSlider.value);
+        instrumentTransform.offsetX = parseFloat(oxSlider.value);
+        instrumentTransform.offsetY = parseFloat(oySlider.value);
+        instrumentTransform.rotation = parseFloat(rotSlider.value);
+        scaleVal.textContent = instrumentTransform.scale.toFixed(2);
+        oxVal.textContent = instrumentTransform.offsetX.toFixed(3);
+        oyVal.textContent = instrumentTransform.offsetY.toFixed(3);
+        rotVal.textContent = instrumentTransform.rotation.toFixed(1) + '\u00B0';
+        computeLayout();
+        requestRedraw();
+      }
+      scaleSlider.addEventListener('input', onTransformChange);
+      oxSlider.addEventListener('input', onTransformChange);
+      oySlider.addEventListener('input', onTransformChange);
+      rotSlider.addEventListener('input', onTransformChange);
+
+      document.getElementById('debug-copy-transform').addEventListener('click', () => {
+        const code = `const instrumentTransform = { scale: ${instrumentTransform.scale}, offsetX: ${instrumentTransform.offsetX}, offsetY: ${instrumentTransform.offsetY}, rotation: ${instrumentTransform.rotation} };`;
+        navigator.clipboard.writeText(code).then(() => {
+          debugStatus.textContent = 'Transform copied!';
+          setTimeout(() => { debugStatus.textContent = ''; }, 1500);
+        });
+      });
+
+      canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left);
+        const my = (e.clientY - rect.top);
+        const hit = debugHitTest(mx, my);
+        if (hit) {
+          debugDrag = hit;
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+
+      canvas.addEventListener('mousemove', (e) => {
+        if (!debugDrag) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        const b = computeLayout.body;
+        if (!b) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left);
+        const my = (e.clientY - rect.top);
+        // Inverse of imgToCanvas: canvas coords → image-relative fractions
+        const rad = instrumentTransform.rotation * Math.PI / 180;
+        const cos = Math.cos(-rad), sin = Math.sin(-rad);
+        const dx = mx - (b.imgX + b.imgW / 2);
+        const dy = my - (b.imgY + b.imgH / 2);
+        const lx = dx * cos - dy * sin;
+        const ly = dx * sin + dy * cos;
+        const fx = lx / b.imgW + 0.5;
+        const fy = ly / b.imgH + 0.5;
+        stringPositions[debugDrag.type][debugDrag.index] = { x: fx, y: fy };
+        computeLayout();
+        requestRedraw();
+      }, true);
+
+      canvas.addEventListener('mouseup', (e) => {
+        if (debugDrag) {
+          debugDrag = null;
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+    }
+
     // ─── Start Overlay (mobile audio unlock) ──────────────────────
     const startOverlay = document.getElementById('start-overlay');
-    if (!matchMedia('(pointer: coarse)').matches) {
-      // Desktop — no overlay needed, remove immediately
+    if (debugMode || !matchMedia('(pointer: coarse)').matches) {
+      // Desktop or debug mode — no overlay needed, remove immediately
       startOverlay.remove();
     } else {
       startOverlay.addEventListener('click', async (e) => {
@@ -1431,14 +1534,13 @@
         await decodeSamples();
         startOverlay.classList.add('hidden');
         setTimeout(() => startOverlay.remove(), 400);
-
-        // On mobile portrait, animate zoom into the strings
-        if (H > W) {
-          playZoomed = true;
-          animateZoomIn();
-        }
       });
     }
+
+    // ─── Prevent browser zoom gestures ─────────────────────────────
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+    document.addEventListener('gestureend', (e) => e.preventDefault());
 
     // ─── Init ──────────────────────────────────────────────────────
     resize();
