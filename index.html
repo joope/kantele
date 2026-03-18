@@ -34,7 +34,7 @@
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": "Kantele",
-    "description": "Play the traditional Finnish kantele online. A virtual 5-string kantele instrument you can strum, pluck, and tune in your browser.",
+    "description": "Play the traditional Finnish kantele online. A virtual 5-string kantele instrument you can strum, pluck, and tune in your browser. Soita kanteletta suoraan selaimessasi.",
     "url": "https://kantele.app",
     "applicationCategory": "MultimediaApplication",
     "operatingSystem": "Any",
@@ -43,6 +43,18 @@
     "keywords": "kantele, Finnish kantele, virtual instrument, 5-string kantele, viisikielinen kantele"
   }
   </script>
+
+  <!-- Google Analytics -->
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-49QY91NE28"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-49QY91NE28');
+  </script>
+
 
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -108,12 +120,12 @@
       position: fixed;
       inset: 0;
       z-index: 200;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(30, 20, 10, 0.6);
       display: none;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
     #help-popup.open {
@@ -122,27 +134,30 @@
 
     #help-popup .help-card {
       position: relative;
-      background: rgba(30, 28, 24, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
-      padding: 20px 18px;
-      max-width: 320px;
+      background: linear-gradient(165deg, #f5ebe0, #eddcc8);
+      border: none;
+      border-radius: 20px;
+      padding: 14px 24px;
+      max-width: 420px;
       width: calc(100% - 32px);
-      color: #ccc;
-      font: 13px/1.5 system-ui, sans-serif;
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      color: #4a3728;
+      font: 14px/1.6 system-ui, sans-serif;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
     #help-popup .help-card .help-close {
       position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 28px;
-      height: 28px;
+      top: 12px;
+      right: 12px;
+      width: 30px;
+      height: 30px;
       border: none;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 18px;
+      background: rgba(100, 70, 40, 0.1);
+      color: #8a7060;
+      font-size: 20px;
       line-height: 1;
       cursor: pointer;
       display: flex;
@@ -153,71 +168,106 @@
     }
 
     #help-popup .help-card .help-close:hover {
-      background: rgba(255, 255, 255, 0.15);
-      color: rgba(255, 255, 255, 0.8);
+      background: rgba(100, 70, 40, 0.2);
+      color: #5a3a20;
     }
 
     #help-popup .help-card h2 {
-      color: #e0d6c8;
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 10px;
+      color: #3a2518;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
     }
 
     #help-popup .help-card ul {
-      list-style: none;
-      padding: 0;
+      list-style: disc;
+      padding-left: 20px;
     }
 
     #help-popup .help-card ul li {
-      padding: 2px 0;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 12.5px;
+      padding: 3px 0;
+      color: #5a4030;
+      font-size: 13.5px;
     }
 
-    #help-popup .help-card ul li::before {
-      content: "– ";
-      color: rgba(255, 255, 255, 0.3);
+    #help-popup .help-card ul li::marker {
+      color: #b8956a;
     }
 
     #help-popup .help-card .divider {
       border: none;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      margin: 12px 0;
+      border-top: 1px solid rgba(120, 80, 40, 0.15);
+      margin: 16px 0;
     }
 
     #help-popup .help-card .support-section p {
-      font-size: 11.5px;
-      line-height: 1.5;
-      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      line-height: 1.55;
+      color: #7a6050;
       margin: 0;
     }
 
     #help-popup .help-card .support-section a {
-      color: #c8a96e;
+      color: #9a6830;
+      font-weight: 600;
       text-decoration: none;
     }
 
     #help-popup .help-card .support-section a:hover {
+      color: #7a4820;
       text-decoration: underline;
     }
 
     #help-popup .play-btn {
       display: block;
-      width: 100%;
-      margin-top: 14px;
-      padding: 10px;
+      width: 40%;
+      margin: 18px auto 0;
+      padding: 11px;
       border: none;
-      border-radius: 8px;
-      background: #3a7a3a;
+      border-radius: 24px;
+      background: #7a9a5a;
       color: #fff;
-      font: 600 14px system-ui, sans-serif;
+      font: 600 15px system-ui, sans-serif;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 2px 8px rgba(90, 120, 60, 0.3);
     }
 
     #help-popup .play-btn:hover {
-      background: #4a9a4a;
+      background: #8aaa6a;
+      transform: scale(1.03);
+    }
+
+    #locale-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    #locale-switcher button {
+      width: 36px;
+      height: 36px;
+      border: 2px solid transparent;
+      border-radius: 50%;
+      background: rgba(100, 70, 40, 0.08);
+      cursor: pointer;
+      font-size: 19px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+      padding: 0;
+    }
+
+    #locale-switcher button:hover {
+      background: rgba(100, 70, 40, 0.15);
+    }
+
+    #locale-switcher button.active {
+      border-color: #b8956a;
+      background: rgba(100, 70, 40, 0.12);
     }
 
     #learn-link {
@@ -232,12 +282,12 @@
 
     #learn-link a {
       pointer-events: auto;
-      color: rgba(255, 255, 255, 0.35);
+      color: rgba(255, 255, 255, 0.65);
       font: 12px/1 system-ui, sans-serif;
       text-decoration: none;
       padding: 6px 12px;
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(142, 72, 72, 0.69);
       transition: color 0.2s, background 0.2s;
     }
 
@@ -252,44 +302,50 @@
 
   <canvas id="kantele" aria-label="Kantele – touch or click the strings to play"></canvas>
 
+  <div id="learn-link"><a href="https://iidamariakuronen.com" target="_blank" rel="noopener" data-i18n="learnLink"></a>
+  </div>
+
   <button id="help-btn" aria-label="Help">?</button>
 
   <div id="help-popup">
     <div class="help-card">
       <button class="help-close" id="help-close-btn">&times;</button>
-      <h2>Kantele - How to play</h2>
+      <div id="locale-switcher">
+        <button data-locale="fi" aria-label="Suomi">&#x1F1EB;&#x1F1EE;</button>
+        <button data-locale="en" aria-label="English">&#x1F1EC;&#x1F1E7;</button>
+      </div>
+      <h2 data-i18n="title"></h2>
       <ul>
-        <li>Swipe across strings to pluck or strum</li>
-        <li>Hold a string to mute it</li>
-        <li>Drag the tuning pegs to adjust pitch</li>
-        <li>Keyboard: 1–5 pluck, Q W E R T mute</li>
+        <li data-i18n="tip1"></li>
+        <li data-i18n="tip2"></li>
+        <li data-i18n="tip3"></li>
       </ul>
 
       <hr class="divider">
 
       <div class="support-section">
-        <p>
-          <strong>Kanteleliitto</strong> (est. 1977) unites kantele professionals, enthusiasts, instrument builders,
-          composers, and researchers.
-          Its largest event, the international kantele competition, draws hundreds of participants from around the world
-          every two years.
-        </p>
+        <p data-i18n="support"></p>
         <p style="margin-top: 6px;">
-          In 2026, the association lost its state funding for the first time — threatening its operations, the
-          competition, and the
-          future of kantele building as craftsmen retire without resources to pass on their skills.
-        </p>
-        <p style="margin-top: 6px;">
-          <a href="https://www.kantele.net" target="_blank" rel="noopener">Support Kanteleliitto →</a>
+          <a href="https://www.kantele.net" target="_blank" rel="noopener" data-i18n="supportLink"></a>
         </p>
       </div>
 
-      <button class="play-btn" id="help-play-btn">Play</button>
+      <button class="play-btn" id="help-play-btn" data-i18n="play"></button>
     </div>
   </div>
 
 
   <script>
+    // ─── Analytics Helper ────────────────────────────────────────
+    function trackEvent(action, category, label, value) {
+      if (typeof gtag === 'function') {
+        const params = { event_category: category };
+        if (label !== undefined) params.event_label = label;
+        if (value !== undefined) params.value = value;
+        gtag('event', action, params);
+      }
+    }
+
     // ─── Audio Engine ──────────────────────────────────────────────
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -401,7 +457,7 @@
 
     // ─── Instrument Transform ─────────────────────────────────────
     // scale: 1 = fit to screen width, offsetX/Y: fraction of screen, rotation: degrees
-    const instrumentTransform = { scale: 0.99, offsetX: -0.016, offsetY: 0.024, rotation: 9.5 };
+    const instrumentTransform = { scale: 0.93, offsetX: -0.016, offsetY: 0.024, rotation: 9.5 };
 
     // ─── String Positions (image-relative fractions) ──────────────
     const stringPositions = {
@@ -498,9 +554,11 @@
     let debugStatus;
 
     // ─── Synthesis ─────────────────────────────────────────────────
+    let _firstMute = true;
     function muteString(idx, pos) {
       if (stringMuteCount[idx] === 0) {
         stopString(idx);
+        if (_firstMute) { trackEvent('first_mute', 'instrument', STRING_NAMES[idx]); _firstMute = false; }
       }
       stringMuteCount[idx]++;
       if (pos !== undefined) mutePos[idx] = pos;
@@ -516,9 +574,11 @@
       return stringMuteCount[idx] > 0;
     }
 
+    let _firstPluck = true;
     function pluckString(stringIndex, velocity = 0.7) {
       if (isStringMuted(stringIndex)) return;
       if (!sampleBuffers[stringIndex]) return;
+      if (_firstPluck) { trackEvent('first_pluck', 'instrument', STRING_NAMES[stringIndex]); _firstPluck = false; }
       const ctx = ensureAudio();
 
       stopString(stringIndex);
@@ -574,6 +634,7 @@
       const vh = window.innerHeight;
       isMobile = matchMedia('(pointer: coarse)').matches;
       mobilePortrait = isMobile && vh > vw;
+      instrumentTransform.rotation = mobilePortrait ? 4.5 : 9.5;
 
       if (mobilePortrait) {
         // Swap dimensions — canvas renders in landscape, CSS rotates it
@@ -762,16 +823,16 @@
         ctx.stroke();
 
         // Main metallic body — offset line
-        const metalOffX = -nx * thickness * 0.15;
-        const metalOffY = -ny * thickness * 0.15;
+        const metalOffX = nx * thickness * 0.15;
+        const metalOffY = ny * thickness * 0.15;
         tracePathOffset(points, nPts, metalOffX, metalOffY);
         ctx.strokeStyle = '#aaa';
         ctx.lineWidth = thickness * 0.7;
         ctx.stroke();
 
         // Bright specular highlight
-        const specOffX = -nx * thickness * 0.3;
-        const specOffY = -ny * thickness * 0.3;
+        const specOffX = nx * thickness * 0.3;
+        const specOffY = ny * thickness * 0.3;
         tracePathOffset(points, nPts, specOffX, specOffY);
         ctx.strokeStyle = 'rgba(255,255,255,0.6)';
         ctx.lineWidth = thickness * 0.25;
@@ -813,10 +874,8 @@
     }
 
     // ─── Tuning Knobs (on-canvas) ─────────────────────────────────
-    const TUNE_KNOB_BASE_RADIUS = 12;
+    const TUNE_KNOB_BASE_RADIUS = 13;
     let tuneKnobDrag = -1; // index of knob being dragged, -1 = none
-    let tuneKnobDragStartY = 0;
-    let tuneKnobDragStartVal = 0;
     let tuneKnobDragTouchId = null; // touch identifier for knob drag
 
     function tuneKnobRadius() {
@@ -859,7 +918,7 @@
         ctx.stroke();
 
         // Indicator line — points in direction matching the tuning value
-        const baseAngle = mobilePortrait ? 0 : -Math.PI / 2;
+        const baseAngle = -Math.PI / 2;
         const angle = baseAngle + tuning[i] * (Math.PI / 12);
         const ix = kp.x + Math.cos(angle) * r * 0.65;
         const iy = kp.y + Math.sin(angle) * r * 0.65;
@@ -867,7 +926,7 @@
         ctx.moveTo(kp.x, kp.y);
         ctx.lineTo(ix, iy);
         ctx.strokeStyle = '#a08868';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2.5;
         ctx.lineCap = 'round';
         ctx.stroke();
       }
@@ -875,8 +934,8 @@
 
     function hitTestTuneKnob(x, y) {
       if (tuneKnobPositions.length < 5) return -1;
-      // Use the same hit radius as strings for consistent touch targets
-      const hitR = stringHitAreas.length > 0 ? stringHitAreas[0].hitRadius : tuneKnobRadius() + 6;
+      const r = tuneKnobRadius();
+      const hitR = isMobile ? r * 2.5 : r * 1.8;
       for (let i = 0; i < 5; i++) {
         const kp = tuneKnobPositions[i];
         if (Math.hypot(x - kp.x, y - kp.y) <= hitR) return i;
@@ -892,29 +951,32 @@
 
     let tuneKnobLastTap = 0; // timestamp of last knob tap
     let tuneKnobLastTapIdx = -1; // which knob was last tapped
-    let tuneKnobDragStartX = 0;
-
+    let _firstTune = true;
     function applyTuneKnobDrag(x, y) {
-      const dx = x - tuneKnobDragStartX;
-      const dy = tuneKnobDragStartY - y;
-      // Use whichever axis has more movement (right/up = higher pitch)
-      // On mobile portrait, canvas is rotated so swap perceived axes
-      let delta;
-      if (mobilePortrait) {
-        const rdx = tuneKnobDragStartY - y; // screen up → canvas -Y
-        const rdy = x - tuneKnobDragStartX; // screen right → canvas +X
-        delta = Math.abs(rdx) > Math.abs(rdy) ? rdx : rdy;
-      } else {
-        delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-      }
-      const semitones = Math.max(-12, Math.min(12, tuneKnobDragStartVal + delta * 0.05));
+      if (tuneKnobDrag < 0 || tuneKnobPositions.length < 5) return;
+      const kp = tuneKnobPositions[tuneKnobDrag];
+      const dx = x - kp.x;
+      const dy = y - kp.y;
+      // Ignore if pointer is too close to knob center (avoid jitter)
+      if (Math.hypot(dx, dy) < 5) return;
+      // Compute angle from knob center to pointer
+      const angle = Math.atan2(dy, dx);
+      const baseAngle = -Math.PI / 2;
+      // Convert angle to semitones: tuning = (angle - baseAngle) / (PI/12)
+      let diff = angle - baseAngle;
+      // Normalize to [-PI, PI]
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      const semitones = Math.max(-12, Math.min(12, diff / (Math.PI / 12)));
       tuning[tuneKnobDrag] = semitones;
       updatePlaybackRate(tuneKnobDrag);
+      if (_firstTune) { trackEvent('first_tune', 'instrument', STRING_NAMES[tuneKnobDrag]); _firstTune = false; }
       debouncedSaveTuning();
       requestRedraw();
     }
 
     function resetTuneKnob(idx) {
+      trackEvent('tune_reset', 'instrument', STRING_NAMES[idx]);
       tuning[idx] = 0;
       updatePlaybackRate(idx);
       debouncedSaveTuning();
@@ -1083,9 +1145,6 @@
             tuneKnobLastTap = now;
             tuneKnobLastTapIdx = knobHit;
             tuneKnobDrag = knobHit;
-            tuneKnobDragStartX = pos.x;
-            tuneKnobDragStartY = pos.y;
-            tuneKnobDragStartVal = tuning[knobHit];
             tuneKnobDragTouchId = touch.identifier;
             info.tuningKnob = true;
           }
@@ -1228,9 +1287,6 @@
       const knobHit = hitTestTuneKnob(pos.x, pos.y);
       if (knobHit >= 0) {
         tuneKnobDrag = knobHit;
-        tuneKnobDragStartX = pos.x;
-        tuneKnobDragStartY = pos.y;
-        tuneKnobDragStartVal = tuning[knobHit];
         return;
       }
 
@@ -1364,11 +1420,68 @@
       }
     });
 
+    // ─── Localization ────────────────────────────────────────────
+    const i18n = {
+      en: {
+        title: 'Welcome to play kantele!',
+        tip1: 'Play the strings by touching or swiping across them',
+        tip2: 'Mute a string by holding it down and play chords by muting the strings that don\u2019t belong to the chord',
+        tip3: 'Twist the tuning pegs to change the pitch',
+        support: '<strong>The Finnish Kantele Association</strong> brings together kantele players, instrument builders, composers, and enthusiasts across Finland and the world. In 2026, the association lost its state funding for the first time, threatening its operations and the preservation of the kantele\u2019s cultural heritage as a living tradition.',
+        supportLink: 'Learn more & support the Finnish Kantele Association \u2192',
+        play: 'Play!',
+        learnLink: 'Want to learn kantele? Connect with a teacher here\u2192',
+      },
+      fi: {
+        title: 'Tervetuloa soittamaan kanteletta!',
+        tip1: 'Soita kieliä koskettamalla tai pyyhkäisemällä niitä',
+        tip2: 'Sammuta kieli pitämällä sitä pohjassa ja soita sointuja sammuttamalla ne kielet, jotka eivät kuulu sointuun',
+        tip3: 'Käännä viritystappeja sävelkorkeuden muuttamiseksi',
+        support: '<strong>Kanteleliitto</strong> kokoaa yhteen kanteleensoittajat, soitinrakentajat, säveltäjät ja harrastajat ympäri Suomea ja maailmaa. Vuonna 2026 liitto menetti ensimmäistä kertaa valtionavustuksensa, mikä uhkaa sen toimintaa ja kanteleen kulttuuriperinnön säilymistä elinvoimaisena.',
+        supportLink: 'Lue lisää ja tue Kanteleliittoa →',
+        play: 'Soita!',
+        learnLink: 'Haluatko oppia kanteletta? Ota yhteys opettajaan t\u00e4\u00e4lt\u00e4\u2192',
+      }
+    };
+
+    let currentLocale = /^fi\b/i.test(navigator.language) ? 'fi' : 'en';
+
+    function applyLocale(locale) {
+      currentLocale = locale;
+      const strings = i18n[locale];
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        if (strings[key]) {
+          if (key === 'support') {
+            el.innerHTML = strings[key];
+          } else {
+            el.textContent = strings[key];
+          }
+        }
+      });
+      document.querySelectorAll('#locale-switcher button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.locale === locale);
+      });
+    }
+
+    document.querySelectorAll('#locale-switcher button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        trackEvent('locale_switch', 'ui', btn.dataset.locale);
+        applyLocale(btn.dataset.locale);
+      });
+    });
+
+    applyLocale(currentLocale);
+
     // ─── Help Popup ──────────────────────────────────────────────
     const helpBtn = document.getElementById('help-btn');
     const helpPopup = document.getElementById('help-popup');
-    helpBtn.addEventListener('click', () => helpPopup.classList.toggle('open'));
+    helpBtn.addEventListener('click', () => {
+      helpPopup.classList.toggle('open');
+      if (helpPopup.classList.contains('open')) trackEvent('help_open', 'ui');
+    });
     document.getElementById('help-play-btn').addEventListener('click', async () => {
+      trackEvent('play_button', 'ui');
       ensureAudio();
       await decodeSamples();
       helpPopup.classList.remove('open');
@@ -1380,10 +1493,16 @@
     });
     helpPopup.addEventListener('click', async (e) => {
       if (e.target.tagName === 'A') return;
+      if (e.target.closest('#locale-switcher')) return;
       ensureAudio();
       await decodeSamples();
       helpPopup.classList.remove('open');
     });
+    // Track outbound link clicks
+    document.querySelectorAll('a[target="_blank"]').forEach(a => {
+      a.addEventListener('click', () => trackEvent('outbound_click', 'link', a.href));
+    });
+
     helpPopup.addEventListener('touchstart', (e) => {
       if (e.target.tagName !== 'A') e.stopPropagation();
     }, { passive: false });
