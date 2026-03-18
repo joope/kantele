@@ -291,7 +291,8 @@
       decodePromise = (async () => {
         await fetchPromise;
         await Promise.all(sampleRawData.map(async (raw, i) => {
-          if (raw) sampleBuffers[i] = await audioCtx.decodeAudioData(raw);
+          // decodeAudioData transfers the ArrayBuffer, so pass a copy
+          if (raw) sampleBuffers[i] = await audioCtx.decodeAudioData(raw.slice(0));
         }));
       })();
       return decodePromise;
@@ -363,7 +364,7 @@
     const kanteleImg = new Image();
     kanteleImg.src = 'kantele_v6.png';
     let imgLoaded = false;
-    kanteleImg.onload = () => { imgLoaded = true; requestRedraw(); };
+    kanteleImg.onload = () => { imgLoaded = true; computeLayout(); requestRedraw(); };
 
     // ─── Background Texture ──────────────────────────────────────
     const bgImg = new Image();
@@ -596,6 +597,7 @@
     }
 
     function computeLayout() {
+      if (!imgLoaded) return;
       const imgAspect = kanteleImg.naturalWidth / kanteleImg.naturalHeight;
       const t = instrumentTransform;
 
@@ -690,6 +692,7 @@
     }
 
     function drawStrings(time) {
+      if (stringEndpoints.length < 5) return;
       const nPts = STRING_STEPS + 1;
       const b = computeLayout.body;
       const sizeScale = b ? b.imgW / 1000 : 1;
@@ -796,6 +799,7 @@
     }
 
     function drawTuneKnobs() {
+      if (tuneKnobPositions.length < 5) return;
       for (let i = 0; i < 5; i++) {
         const kp = tuneKnobPositions[i];
         const r = tuneKnobRadius();
@@ -843,6 +847,7 @@
     }
 
     function hitTestTuneKnob(x, y) {
+      if (tuneKnobPositions.length < 5) return -1;
       // Use the same hit radius as strings for consistent touch targets
       const hitR = stringHitAreas.length > 0 ? stringHitAreas[0].hitRadius : tuneKnobRadius() + 6;
       for (let i = 0; i < 5; i++) {
