@@ -75,105 +75,7 @@
       touch-action: none;
     }
 
-    #tuning-btn {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 10;
-      width: 40px;
-      height: 40px;
-      border: none;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.12);
-      color: #ccc;
-      font-size: 20px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      transition: background 0.2s;
-    }
 
-    #tuning-btn:hover {
-      background: rgba(255, 255, 255, 0.22);
-    }
-
-    #tuning-btn.active {
-      background: rgba(255, 255, 255, 0.28);
-      color: #fff;
-    }
-
-    #tuning-panel {
-      position: fixed;
-      top: 60px;
-      right: 12px;
-      z-index: 10;
-      background: rgba(20, 20, 20, 0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 16px;
-      display: none;
-      min-width: 200px;
-    }
-
-    #tuning-panel.open {
-      display: block;
-    }
-
-    #tuning-panel h3 {
-      color: #aaa;
-      font: 11px/1 system-ui, sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 12px;
-    }
-
-    .tune-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .tune-row label {
-      color: #ccc;
-      font: 13px/1 system-ui, sans-serif;
-      width: 24px;
-      text-align: right;
-    }
-
-    .tune-row input[type=range] {
-      flex: 1;
-      accent-color: #888;
-    }
-
-    .tune-row .tune-val {
-      color: #999;
-      font: 12px/1 monospace;
-      width: 62px;
-      text-align: right;
-    }
-
-    #tuning-panel button.reset-btn {
-      margin-top: 8px;
-      width: 100%;
-      padding: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      color: #aaa;
-      font: 12px system-ui, sans-serif;
-      cursor: pointer;
-    }
-
-    #tuning-panel button.reset-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
-      color: #ccc;
-    }
 
     #start-overlay {
       position: fixed;
@@ -213,6 +115,123 @@
       cursor: pointer;
     }
 
+
+    #help-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #ccc;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: background 0.2s;
+      font-family: system-ui, sans-serif;
+    }
+
+    #help-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    #help-popup {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    #help-popup.open {
+      display: flex;
+    }
+
+    #help-popup .help-card {
+      background: rgba(30, 28, 24, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 20px 18px;
+      max-width: 320px;
+      width: calc(100% - 32px);
+      color: #ccc;
+      font: 13px/1.5 system-ui, sans-serif;
+    }
+
+    #help-popup .help-card h2 {
+      color: #e0d6c8;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    #help-popup .help-card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    #help-popup .help-card ul li {
+      padding: 2px 0;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 12.5px;
+    }
+
+    #help-popup .help-card ul li::before {
+      content: "– ";
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    #help-popup .help-card .divider {
+      border: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      margin: 12px 0;
+    }
+
+    #help-popup .help-card .support-section p {
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.5);
+      margin: 0;
+    }
+
+    #help-popup .help-card .support-section a {
+      color: #c8a96e;
+      text-decoration: none;
+    }
+
+    #help-popup .help-card .support-section a:hover {
+      text-decoration: underline;
+    }
+
+    #help-popup .play-btn {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #3a7a3a;
+      color: #fff;
+      font: 600 14px system-ui, sans-serif;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #help-popup .play-btn:hover {
+      background: #4a9a4a;
+    }
 
     #learn-link {
       position: fixed;
@@ -260,12 +279,41 @@
       Connect with a teacher here→</a>
   </div>
 
-  <button id="tuning-btn" aria-label="Tuning">&#9881;</button>
-  <div id="tuning-panel">
-    <h3>Tuning</h3>
-    <div id="tune-rows"></div>
-    <button class="reset-btn" id="tune-reset">Reset</button>
+  <button id="help-btn" aria-label="Help">?</button>
+
+  <div id="help-popup">
+    <div class="help-card">
+      <h2>Kantele - How to play</h2>
+      <ul>
+        <li>Swipe across strings to pluck or strum</li>
+        <li>Hold a string to mute it</li>
+        <li>Drag the tuning pegs to adjust pitch</li>
+        <li>Keyboard: 1–5 pluck, Q W E R T mute</li>
+      </ul>
+
+      <hr class="divider">
+
+      <div class="support-section">
+        <p>
+          <strong>Kanteleliitto</strong> (est. 1977) unites kantele professionals, enthusiasts, instrument builders,
+          composers, and researchers.
+          Its largest event, the international kantele competition, draws hundreds of participants from around the world
+          every two years.
+        </p>
+        <p style="margin-top: 6px;">
+          In 2026, the association lost its state funding for the first time — threatening its operations, the
+          competition, and the
+          future of kantele building as craftsmen retire without resources to pass on their skills.
+        </p>
+        <p style="margin-top: 6px;">
+          <a href="https://www.kantele.net" target="_blank" rel="noopener">Support Kanteleliitto →</a>
+        </p>
+      </div>
+
+      <button class="play-btn" id="help-play-btn">Play</button>
+    </div>
   </div>
+
 
   <script>
     // ─── Audio Engine ──────────────────────────────────────────────
@@ -883,8 +931,6 @@
       const semitones = Math.max(-12, Math.min(12, tuneKnobDragStartVal + delta * 0.05));
       tuning[tuneKnobDrag] = semitones;
       updatePlaybackRate(tuneKnobDrag);
-      tuneSliders[tuneKnobDrag].value = semitones;
-      tuneLabels[tuneKnobDrag].textContent = formatCents(semitones);
       debouncedSaveTuning();
       requestRedraw();
     }
@@ -892,8 +938,6 @@
     function resetTuneKnob(idx) {
       tuning[idx] = 0;
       updatePlaybackRate(idx);
-      tuneSliders[idx].value = 0;
-      tuneLabels[idx].textContent = formatCents(0);
       debouncedSaveTuning();
       requestRedraw();
     }
@@ -1105,13 +1149,14 @@
           continue;
         }
 
-        // If muting a string and dragged off its hit area, unmute first
-        // (so strum check below sees it as unmuted, but we track it to avoid
-        // plucking it from this same movement)
+        // Strum: check if finger path crossed any string lines
+        const crossed = strumCrossTest(info.lastX, info.lastY, pos.x, pos.y);
+
+        // Only unmute when the finger actually crosses another string
         let justUnmuted = -1;
-        if (info.mutedString >= 0) {
-          const hit = hitTestString(pos.x, pos.y, 0.15);
-          if (hit !== info.mutedString) {
+        if (info.mutedString >= 0 && crossed.length > 0) {
+          const crossedOther = crossed.some(si => si !== info.mutedString);
+          if (crossedOther) {
             justUnmuted = info.mutedString;
             unmuteString(info.mutedString);
             info.mutedString = -1;
@@ -1119,8 +1164,6 @@
           }
         }
 
-        // Strum: check if finger path crossed any string lines
-        const crossed = strumCrossTest(info.lastX, info.lastY, pos.x, pos.y);
         for (const si of crossed) {
           // Skip the string currently muted by this finger
           if (si === info.mutedString) continue;
@@ -1240,11 +1283,14 @@
 
       if (!mouseDown) return;
 
-      // If muting a string and dragged off its hit area, unmute first
+      // Strum: check if mouse path crossed any string lines
+      const crossed = strumCrossTest(mouseLastX, mouseLastY, pos.x, pos.y);
+
+      // Only unmute when the mouse actually crosses another string
       let justUnmuted = -1;
-      if (mouseMutedString >= 0) {
-        const hit = hitTestString(pos.x, pos.y, 0.15);
-        if (hit !== mouseMutedString) {
+      if (mouseMutedString >= 0 && crossed.length > 0) {
+        const crossedOther = crossed.some(si => si !== mouseMutedString);
+        if (crossedOther) {
           justUnmuted = mouseMutedString;
           unmuteString(mouseMutedString);
           mouseMutedString = -1;
@@ -1252,8 +1298,6 @@
         }
       }
 
-      // Strum: check if mouse path crossed any string lines
-      const crossed = strumCrossTest(mouseLastX, mouseLastY, pos.x, pos.y);
       for (const si of crossed) {
         // Skip the string currently muted by this pointer
         if (si === mouseMutedString) continue;
@@ -1341,73 +1385,19 @@
       }
     });
 
-    // ─── Tuning UI ────────────────────────────────────────────────
-    const tuningBtn = document.getElementById('tuning-btn');
-    const tuningPanel = document.getElementById('tuning-panel');
-    const tuneRows = document.getElementById('tune-rows');
-    const tuneReset = document.getElementById('tune-reset');
-
-    tuningBtn.addEventListener('click', () => {
-      tuningPanel.classList.toggle('open');
-      tuningBtn.classList.toggle('active');
+    // ─── Help Popup ──────────────────────────────────────────────
+    const helpBtn = document.getElementById('help-btn');
+    const helpPopup = document.getElementById('help-popup');
+    helpBtn.addEventListener('click', () => helpPopup.classList.toggle('open'));
+    document.getElementById('help-play-btn').addEventListener('click', () => helpPopup.classList.remove('open'));
+    helpPopup.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'A') helpPopup.classList.remove('open');
     });
-
-    // Prevent touch/mouse events on the panel from reaching the canvas
-    tuningPanel.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
-    tuningPanel.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
-    tuningPanel.addEventListener('mousedown', (e) => e.stopPropagation());
-
-    const tuneSliders = [];
-    const tuneLabels = [];
-
-    for (let i = 0; i < 5; i++) {
-      const row = document.createElement('div');
-      row.className = 'tune-row';
-
-      const label = document.createElement('label');
-      label.textContent = STRING_NAMES[i];
-
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = -12;
-      slider.max = 12;
-      slider.step = 0.01;
-      slider.value = tuning[i];
-
-      const val = document.createElement('span');
-      val.className = 'tune-val';
-      val.textContent = formatCents(tuning[i]);
-
-      slider.addEventListener('input', () => {
-        tuning[i] = Number(slider.value);
-        updatePlaybackRate(i);
-        val.textContent = formatCents(tuning[i]);
-        debouncedSaveTuning();
-        requestRedraw();
-      });
-
-      row.appendChild(label);
-      row.appendChild(slider);
-      row.appendChild(val);
-      tuneRows.appendChild(row);
-      tuneSliders.push(slider);
-      tuneLabels.push(val);
-    }
-
-    function formatCents(v) {
-      const cents = Math.round(v * 100);
-      if (cents === 0) return '0 ¢';
-      return (cents > 0 ? '+' : '') + cents + ' ¢';
-    }
-
-    tuneReset.addEventListener('click', () => {
-      for (let i = 0; i < 5; i++) {
-        tuning[i] = 0;
-        tuneSliders[i].value = 0;
-        tuneLabels[i].textContent = formatCents(0);
-      }
-      saveTuning();
-    });
+    helpPopup.addEventListener('touchstart', (e) => {
+      if (e.target.tagName !== 'A') e.stopPropagation();
+    }, { passive: false });
+    helpPopup.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+    helpPopup.addEventListener('mousedown', (e) => e.stopPropagation());
 
     // ─── Debug UI Init ─────────────────────────────────────────────
     if (debugMode) {
