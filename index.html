@@ -202,6 +202,12 @@
       color: #b8956a;
     }
 
+    @media (pointer: coarse) {
+      .keyboard-only {
+        display: none;
+      }
+    }
+
     #help-popup .help-card .divider {
       border: none;
       border-top: 1px solid rgba(120, 80, 40, 0.15);
@@ -327,6 +333,7 @@
         <li data-i18n="tip1"></li>
         <li data-i18n="tip2"></li>
         <li data-i18n="tip3"></li>
+        <li data-i18n="tip4" class="keyboard-only"></li>
       </ul>
 
       <hr class="divider">
@@ -1436,8 +1443,9 @@
         tip1: 'Play the strings by touching or swiping across them',
         tip2: 'Mute a string by holding it down and play chords by muting the strings that don\u2019t belong to the chord',
         tip3: 'Twist the tuning pegs to change the pitch',
+        tip4: 'You can also play using a keyboard: keys 1–5 pluck the strings, Q–T mute them, and spacebar strums all strings',
         support: '<strong>The Finnish Kantele Association</strong> brings together kantele players, instrument builders, composers, and enthusiasts across Finland and the world. In 2026, the association lost its state funding for the first time, threatening its operations and the preservation of the kantele\u2019s cultural heritage as a living tradition.',
-        supportLink: 'Learn more & support the Finnish Kantele Association \u2192',
+        supportLink: 'Learn more & support Finnish Kantele Association \u2192',
         play: 'Play!',
         learnLink: 'Want to learn kantele? Connect with a teacher here\u2192',
       },
@@ -1446,6 +1454,7 @@
         tip1: 'Soita kieliä koskettamalla tai pyyhkäisemällä niitä',
         tip2: 'Sammuta kieli pitämällä sitä pohjassa ja soita sointuja sammuttamalla ne kielet, jotka eivät kuulu sointuun',
         tip3: 'Käännä viritystappeja sävelkorkeuden muuttamiseksi',
+        tip4: 'Näppäimistön näppäimet 1–5 soittavat kieliä, Q–T sammuttavat ne ja välilyönti soittaa kaikki kielet',
         support: '<strong>Kanteleliitto</strong> kokoaa yhteen kanteleensoittajat, soitinrakentajat, säveltäjät ja harrastajat ympäri Suomea ja maailmaa. Vuonna 2026 liitto menetti ensimmäistä kertaa valtionavustuksensa, mikä uhkaa sen toimintaa ja kanteleen kulttuuriperinnön säilymistä elinvoimaisena.',
         supportLink: 'Lue lisää ja tue Kanteleliittoa →',
         play: 'Soita!',
