@@ -769,12 +769,12 @@
     // Pre-computed shadow color strings
     const _shadowColors = [0, 1, 2, 3].map(s => `rgba(90,60,5,${0.06 - s * 0.03})`);
 
-    function computeStringPath(out, ep, dx, dy, nx, ny, vib, time, i) {
+    function computeStringPath(out, ep, dx, dy, nx, ny, vib, time, i, scale) {
       for (let s = 0; s <= STRING_STEPS; s++) {
         const t = s / STRING_STEPS;
         const envelope = Math.sin(t * Math.PI);
         const displacement = vib > 0.001
-          ? vib * envelope * (envelope * Math.sin(time * 25 + i) + Math.sin(t * Math.PI * 2) * Math.sin(time * 38 + i) * 0.3) * 8
+          ? vib * envelope * (envelope * Math.sin(time * 25 + i) + Math.sin(t * Math.PI * 2) * Math.sin(time * 38 + i) * 0.3) * 8 * scale
           : 0;
         out[s].x = ep.x1 + dx * t + nx * displacement;
         out[s].y = ep.y1 + dy * t + ny * displacement;
@@ -816,7 +816,7 @@
         const ny = dx / len;
 
         const points = _pathPoints[i];
-        computeStringPath(points, ep, dx, dy, nx, ny, vib, time, i);
+        computeStringPath(points, ep, dx, dy, nx, ny, vib, time, i, sizeScale);
 
         // Shadow underneath the string (fewer passes on mobile)
         const shadowDx = nx * 2 * sizeScale - 10;
