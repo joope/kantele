@@ -104,9 +104,9 @@
       z-index: 10;
       width: 40px;
       height: 40px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.5);
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.3);
       color: #ccc;
       font-size: 18px;
       font-weight: bold;
@@ -167,8 +167,15 @@
     }
 
     @keyframes rec-pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
     }
 
     #rec-btn.has-recording::after {
@@ -1225,7 +1232,6 @@
       while (diff < -Math.PI) diff += 2 * Math.PI;
       const semitones = Math.max(-12, Math.min(12, diff / (Math.PI / 12)));
       tuning[tuneKnobDrag] = semitones;
-      recTuningChange(tuneKnobDrag, semitones);
       updatePlaybackRate(tuneKnobDrag);
       if (_firstTune) { trackEvent('first_tune', 'instrument', STRING_NAMES[tuneKnobDrag]); _firstTune = false; }
       debouncedSaveTuning();
@@ -1236,7 +1242,6 @@
       if (recording) return;
       trackEvent('tune_reset', 'instrument', STRING_NAMES[idx]);
       tuning[idx] = 0;
-      recTuningChange(idx, 0);
       updatePlaybackRate(idx);
       debouncedSaveTuning();
       requestRedraw();
@@ -1760,8 +1765,7 @@
     const MAX_RECORDING_MS = 20000;
     let recording = false;
     let recStart = 0;
-    let recEvents = []; // {t, a: 0=pluck|1=mute|2=unmute|3=tune, s: 0-4, v?: 0-7, semi?: int}
-    let recLastTuning = [0, 0, 0, 0, 0];
+    let recEvents = []; // {t, a: 0=pluck|1=mute|2=unmute, s: 0-4, v?: 0-7}
 
     function recEvent(action, stringIdx, velocity) {
       if (!recording) return;
@@ -1772,28 +1776,18 @@
       recEvents.push(ev);
     }
 
-    function recTuningChange(stringIdx, semitones) {
-      if (!recording) return;
-      const rounded = Math.round(semitones);
-      if (rounded === recLastTuning[stringIdx]) return;
-      recLastTuning[stringIdx] = rounded;
-      const t = performance.now() - recStart;
-      if (t > MAX_RECORDING_MS) { stopRecording(); return; }
-      recEvents.push({ t: Math.round(t), a: 3, s: stringIdx, semi: rounded });
-    }
-
     // Bitstream helpers
     function BitWriter() {
       this.bytes = []; this.byte = 0; this.bit = 0;
     }
-    BitWriter.prototype.write = function(val, n) {
+    BitWriter.prototype.write = function (val, n) {
       for (let i = n - 1; i >= 0; i--) {
         this.byte = (this.byte << 1) | ((val >> i) & 1);
         this.bit++;
         if (this.bit === 8) { this.bytes.push(this.byte); this.byte = 0; this.bit = 0; }
       }
     };
-    BitWriter.prototype.finish = function() {
+    BitWriter.prototype.finish = function () {
       if (this.bit > 0) { this.byte <<= (8 - this.bit); this.bytes.push(this.byte); }
       return new Uint8Array(this.bytes);
     };
@@ -1801,7 +1795,7 @@
     function BitReader(buf) {
       this.buf = buf; this.pos = 0; this.bit = 0;
     }
-    BitReader.prototype.read = function(n) {
+    BitReader.prototype.read = function (n) {
       let val = 0;
       for (let i = 0; i < n; i++) {
         if (this.pos >= this.buf.length) return -1;
@@ -1811,7 +1805,7 @@
       }
       return val;
     };
-    BitReader.prototype.hasMore = function(n) {
+    BitReader.prototype.hasMore = function (n) {
       return (this.pos * 8 + this.bit + n) <= this.buf.length * 8;
     };
 
@@ -1850,11 +1844,17 @@
 
     function encodeSong(tuningArr, events) {
       const w = new BitWriter();
-      // Header: 5 tuning values, 5 bits each (value + 12)
-      for (let i = 0; i < 5; i++) w.write(Math.max(0, Math.min(31, (tuningArr[i] || 0) + 12)), 5);
-      // Events
+      // Header: 5 tuning values, 16 bits each (signed fixed-point, ×100)
+      // Range: -327.68 to +327.67 semitones — far more than needed
+      for (let i = 0; i < 5; i++) {
+        const raw = Math.round((tuningArr[i] || 0) * 100);
+        const val = Math.max(0, Math.min(65535, raw + 32768));
+        w.write(val, 16);
+      }
+      // Events: pluck (a=0), mute (a=1), unmute (a=2) — no tuning events
       let prevT = 0;
       for (const ev of events) {
+        if (ev.a === 3) continue; // skip any tuning events
         let dt = Math.round((ev.t - prevT) / 10); // 10ms units
         prevT = ev.t;
         // Write delta: if < 63 use 6 bits, else 6 bits of 63 + 8 bits extension
@@ -1869,14 +1869,8 @@
           w.write(63, 6);
           w.write(dt - 63, 8);
         }
-        if (ev.a === 3) {
-          w.write(15, 4); // escape code for tuning event
-          w.write(ev.s, 3);
-          w.write(Math.max(0, Math.min(31, (ev.semi || 0) + 12)), 5);
-        } else {
-          w.write(ev.a * 5 + ev.s, 4);
-          if (ev.a === 0) w.write(ev.v || 0, 3);
-        }
+        w.write(ev.a * 5 + ev.s, 4);
+        if (ev.a === 0) w.write(ev.v || 0, 3);
       }
       return toBase64Url(w.finish());
     }
@@ -1885,7 +1879,8 @@
       const buf = fromBase64Url(str);
       const r = new BitReader(buf);
       const t = [];
-      for (let i = 0; i < 5; i++) t.push(r.read(5) - 12);
+      // Header: 5 tuning values, 16 bits each (signed fixed-point, ×100)
+      for (let i = 0; i < 5; i++) t.push((r.read(16) - 32768) / 100);
       const events = [];
       let absT = 0;
       while (r.hasMore(10)) { // minimum event: 6 + 4 = 10 bits
@@ -1897,22 +1892,14 @@
         absT += dt * 10;
         const combo = r.read(4);
         if (combo < 0) break;
-        if (combo === 15) {
-          // Tuning event
-          if (!r.hasMore(8)) break;
-          const si = r.read(3);
-          const semi = r.read(5) - 12;
-          events.push({ t: absT, a: 3, s: si, semi });
-        } else {
-          const action = Math.floor(combo / 5);
-          const stringIdx = combo % 5;
-          let vel = 0;
-          if (action === 0) {
-            if (!r.hasMore(3)) break;
-            vel = r.read(3);
-          }
-          events.push({ t: absT, a: action, s: stringIdx, v: vel });
+        const action = Math.floor(combo / 5);
+        const stringIdx = combo % 5;
+        let vel = 0;
+        if (action === 0) {
+          if (!r.hasMore(3)) break;
+          vel = r.read(3);
         }
+        events.push({ t: absT, a: action, s: stringIdx, v: vel });
       }
       return { tuning: t, events };
     }
@@ -1931,7 +1918,6 @@
       ensureAudio();
       decodeSamples();
       recEvents = [];
-      recLastTuning = tuning.map(Math.round);
       recStart = performance.now();
       recording = true;
       currentSong = null;
@@ -1951,7 +1937,7 @@
       recTimerInterval = null;
       if (recEvents.length > 0) {
         recBtn.classList.add('has-recording');
-        currentSong = { tuning: tuning.map(Math.round), events: recEvents.slice() };
+        currentSong = { tuning: tuning.slice(), events: recEvents.slice() };
         showPlayButton();
         prepareSongUrl();
         showSharePopup();
@@ -2046,6 +2032,7 @@
       for (const t of playbackTimers) clearTimeout(t);
       playbackTimers = [];
       stopAll();
+      for (let i = 0; i < 5; i++) { while (stringMuteCount[i] > 0) unmuteString(i); }
       playing = false;
       playBtn.classList.remove('playing');
     }
@@ -2086,17 +2073,13 @@
           if (ev.a === 0) pluckString(ev.s, 0.3 + (ev.v || 0) * 0.1);
           else if (ev.a === 1) muteString(ev.s);
           else if (ev.a === 2) unmuteString(ev.s);
-          else if (ev.a === 3) {
-            tuning[ev.s] = ev.semi;
-            updatePlaybackRate(ev.s);
-            requestRedraw();
-          }
         }, t + startDelay);
         playbackTimers.push(timer);
       }
 
-      // Song finished — stop playing state
+      // Song finished — stop playing state and release any held mutes
       const endTimer = setTimeout(() => {
+        for (let i = 0; i < 5; i++) { while (stringMuteCount[i] > 0) unmuteString(i); }
         playing = false;
         playbackTimers = [];
         playBtn.classList.remove('playing');
@@ -2290,7 +2273,7 @@
             pendingSong = null;
             return;
           }
-        } catch (e) {}
+        } catch (e) { }
         // Browser blocked auto-play — show shared song popup
         showSharedSongPopup();
       })();
